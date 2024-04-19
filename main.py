@@ -431,10 +431,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount'])))
-        if float(stock["earning_rate"]) < sell_earning_rate + 1:
-            return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
-        else:
-            return self._sell_current_price(stock, remain, sell_stock_amount)
+        return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
     def sell_1_stock(self, stock, sell_earning_rate, remain):
         # 매도#
@@ -444,10 +441,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount'])))
-        if float(stock["earning_rate"]) < sell_earning_rate + 1:
-            return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
-        else:
-            return self._sell_1_stock_current_price(stock, remain)
+        return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
 
 if __name__ == "__main__":
     argument = sys.argv  # 0: 물타기매수/신규매수/매도 1: 물타기매수 2: 매도 3: 신규매수
