@@ -15,12 +15,16 @@ SELL_STOCK_AMOUNT = "1차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_2 = "2차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_3 = "3차 매도주식금액"  # 매도 주식 금액
 REBUY_EARNING_RATE = "물타기 기준(%)"  # 물타기 기준
+REBUY_1_STOCK_EARNING_RATE = "1주 매수 기준(%)" # 1주 매수 기준
 SELL_EARNING_RATE = "매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_2 = "2차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_3 = "3차 매도 기준(%)"  # 매도 기준
 SELL_1_STOCK_EARNING_RATE = "1주 매도 기준(%)" # 1주 매도 기준
 SELL_ALL_EARNING_RATE = 10  # 사용안함
 MAX_AMOUNT = "종목별 매수 최대 금액(원)"  # 종목별 매수 최대 금액
+REMAIN_MONEY_BUY_NEW_STOCK_UP_RATE = {30000000: 200,
+                                      10000000: 150}  # 예수금: 종목갯수 ( 예수금 이상일 때 종목갯수만큼 보유종목 유지)
+REMAIN_MONEY_BUY_NEW_STOCK_DOWN_RATE = {10000000: 100}  # 예수금: 종목갯수 ( 예수금 이하일 때 종목갯수만큼 보유종목 유지)
 DEFAULT_BUY_NEW_STOCK_NUM = "기본 보유종목 개수"  # 기본 보유종목 갯수
 STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
@@ -55,6 +59,7 @@ class Trading:
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [4, 8, 12]
         self.sell_1_stock_earning_rate = 3
+        self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
         self.default_buy_new_stock_num = 100
         self.remain_money_buy_new_stock_down_rate = {}
@@ -109,6 +114,8 @@ class Trading:
                 self.sell_earning_rate[2] = row[1]
             elif row[2] == SELL_1_STOCK_EARNING_RATE:
                 self.sell_1_stock_earning_rate = row[1]
+            elif row[2] == REBUY_1_STOCK_EARNING_RATE:
+                self.rebuy_1_stock_earning_rate = row[1]
             elif row[2] == MAX_AMOUNT:
                 self.max_amount = row[1]
             elif row[2] == DEFAULT_BUY_NEW_STOCK_NUM:
@@ -412,16 +419,16 @@ class Trading:
     def rebuy_user_stock(self, stock):
         # 물타기 매수#
 
-        # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
-        buy_amount = int(stock['buy_amount'])
-        if buy_amount > self.max_amount:
-            logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount, self.max_amount))
-            return
-
         logger.debug("### 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_earning_rate, stock['name'], stock['earning_rate'], int(stock['buy_price']),
                                                                                int(stock['buy_amount'])))
-        if float(stock["earning_rate"]) <= self.rebuy_earning_rate:
-            self._buy_current_price(stock['code'], self.rebuy_stock_amount, int(stock['buy_amount']))
+        self._buy_designated_price(stock['code'], self.rebuy_stock_amount, self.rebuy_earning_rate, stock['buy_price'], int(stock['buy_amount']))
+
+    def rebuy_1_stock(self, stock):
+        # 물타기 매수#
+
+        logger.debug("### 1주 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_1_stock_earning_rate, stock['name'], stock['earning_rate'], int(stock['buy_price']),
+                                                                               int(stock['buy_amount'])))
+        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
 
     def sell_user_stock(self, stock, sell_earning_rate, remain, sell_stock_amount):
         # 매도#
@@ -431,13 +438,14 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount'])))
+
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
     def sell_1_stock(self, stock, sell_earning_rate, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount'])))
@@ -485,7 +493,7 @@ if __name__ == "__main__":
         logger.debug('주식정보 가져오기')
         trade.get_user_stock()
 
-        with open("C:\\Users\\deser\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
+        with open("D:\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
             wr = csv.writer(f)
             wr.writerow(["{}".format(datetime.datetime.today().strftime("%Y/%m/%d")), "{}".format(trade.user_stock_num)])
 
@@ -494,10 +502,18 @@ if __name__ == "__main__":
             logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
             logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
             for i in range(len(trade.user_stock_list)):
+                # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
+                stock = trade.user_stock_list[i]
+                buy_amount = int(stock['buy_amount'])
+                if buy_amount > trade.max_amount:
+                    logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
+                                                                                       trade.max_amount))
+                    continue
                 if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                    trade.rebuy_user_stock(trade.user_stock_list[i])
+                    trade.rebuy_1_stock(stock)
+                    trade.rebuy_user_stock(stock)
                 else:
-                    logger.debug("물타기 제외 종목입니다 : {}".format(trade.user_stock_list[i]))
+                    logger.debug("물타기 제외 종목입니다 : {}".format(stock))
 
             sleep(10)
             trade.get_user_stock()
@@ -533,9 +549,8 @@ if __name__ == "__main__":
     except Exception as err:
         logger.exception(err)
 
-    logger.debug("######## 완료 ########")
     os.system("taskkill /im KaKaoTalk.exe")
-    os.system("C:\\Users\\deser\\PycharmProjects\\secretary\\카카오톡.lnk")
+    os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
 
     '''
 
