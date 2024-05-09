@@ -30,6 +30,7 @@ class Kiwoom(QAxWidget):
         self.ret_multi_data = []
         self.ret_data = {}
         self.ret_cnt = 0
+        self.code_list = []
 
     def _create_kiwoom_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
