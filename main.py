@@ -401,12 +401,13 @@ class Trading:
     def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
             return
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
+
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
                 break
-        price = int(price / unit) + 1
+        price = int(price / unit) + 1 # 올림
         price = int(price * unit)
         num = 1
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
@@ -549,6 +550,15 @@ if __name__ == "__main__":
                 if remain:
                     remain = trade.sell_user_stock(stock, trade.sell_earning_rate[2], remain, trade.sell_stock_amount_3)
                 logger.debug("남은 주식 수 : {}".format(remain))
+
+        if argument[1] == '4':
+            logger.debug('>>>>>>>>>>>> 1주 매도 <<<<<<<<<<<<<<')
+            for stock in trade.user_stock_list:
+                remain = int(stock['possession_num'])
+                # 1주 매도
+                trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
+
+
     except Exception as err:
         logger.exception(err)
 
