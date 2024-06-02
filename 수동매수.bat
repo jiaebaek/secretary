@@ -1,0 +1,1 @@
+C:\Users\user1\anaconda3\envs\ENV_NAME\python.exe D:\PycharmProjects\secretary\main.py 5 normal -1% 1ea
