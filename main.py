@@ -644,8 +644,9 @@ if __name__ == "__main__":
     except Exception as err:
         logger.exception(err)
 
-    os.system("taskkill /im KaKaoTalk.exe")
-    os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
+    if argument[1] in ['0', '1', '2', '3']:
+        os.system("taskkill /im KaKaoTalk.exe")
+        os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
 
     '''
 
