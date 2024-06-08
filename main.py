@@ -601,8 +601,8 @@ if __name__ == "__main__":
                                                                                        trade.max_amount))
                     continue
                 if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                    trade.rebuy_1_stock(stock)
                     trade.rebuy_user_stock(stock)
+                    trade.rebuy_1_stock(stock)
                 else:
                     logger.debug("물타기 제외 종목입니다 : {}".format(stock))
 
