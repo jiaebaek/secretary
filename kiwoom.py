@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import datetime
 
-LOG_FILE = 'C:\\inetpub\\wwwroot\\log\\'
+LOG_FILE = 'D:\\secretary_log\\'
 logger = logging.getLogger("trader")
 logger.setLevel(logging.DEBUG)
 
@@ -59,12 +59,12 @@ class Kiwoom(QAxWidget):
 
     def get_connect_state(self):
         """
-    322         현재 접속상태를 반환합니다. 
-    323  
-    324         반환되는 접속상태는 아래와 같습니다. 
-    325         0: 미연결, 1: 연결 
-    326  
-    327         :return: int 
+    322         현재 접속상태를 반환합니다.
+    323
+    324         반환되는 접속상태는 아래와 같습니다.
+    325         0: 미연결, 1: 연결
+    326
+    327         :return: int
     328         """
         state = self.dynamicCall("GetConnectState()")
         return state
@@ -177,6 +177,7 @@ class Kiwoom(QAxWidget):
                 'buy_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입가")),
                 'buy_amount': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입금액")),
                 'possession_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "보유수량")),
+                'available_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매매가능수량")),
                 'earning_rate': '{}'.format(total_earning_rate)
             }
             self.ret_multi_data.append(data)
@@ -219,20 +220,20 @@ class Kiwoom(QAxWidget):
 
     def send_condition(self, screenNo, conditionName, conditionIndex, isRealTime):
         """
-    763         종목 조건검색 요청 메서드 
-    764  
-    765         이 메서드로 얻고자 하는 것은 해당 조건에 맞는 종목코드이다. 
-    766         해당 종목에 대한 상세정보는 setRealReg() 메서드로 요청할 수 있다. 
-    767         요청이 실패하는 경우는, 해당 조건식이 없거나, 조건명과 인덱스가 맞지 않거나, 조회 횟수를 초과하는 경우 발생한다. 
-    768  
-    769         조건검색에 대한 결과는 
-    770         1회성 조회의 경우, receiveTrCondition() 이벤트로 결과값이 전달되며 
-    771         실시간 조회의 경우, receiveTrCondition()과 receiveRealCondition() 이벤트로 결과값이 전달된다. 
-    772  
-    773         :param screenNo: string 
-    774         :param conditionName: string - 조건식 이름 
-    775         :param conditionIndex: int - 조건식 인덱스 
-    776         :param isRealTime: int - 조건검색 조회구분(0: 1회성 조회, 1: 실시간 조회) 
+    763         종목 조건검색 요청 메서드
+    764
+    765         이 메서드로 얻고자 하는 것은 해당 조건에 맞는 종목코드이다.
+    766         해당 종목에 대한 상세정보는 setRealReg() 메서드로 요청할 수 있다.
+    767         요청이 실패하는 경우는, 해당 조건식이 없거나, 조건명과 인덱스가 맞지 않거나, 조회 횟수를 초과하는 경우 발생한다.
+    768
+    769         조건검색에 대한 결과는
+    770         1회성 조회의 경우, receiveTrCondition() 이벤트로 결과값이 전달되며
+    771         실시간 조회의 경우, receiveTrCondition()과 receiveRealCondition() 이벤트로 결과값이 전달된다.
+    772
+    773         :param screenNo: string
+    774         :param conditionName: string - 조건식 이름
+    775         :param conditionIndex: int - 조건식 인덱스
+    776         :param isRealTime: int - 조건검색 조회구분(0: 1회성 조회, 1: 실시간 조회)
     777         """
         if not self.get_connect_state():
             raise Exception()
@@ -292,13 +293,13 @@ class Kiwoom(QAxWidget):
 
     def _receive_tr_condition(self, screenNo, codes, conditionName, conditionIndex, inquiry):
         """
-    680         (1회성, 실시간) 종목 조건검색 요청시 발생되는 이벤트 
-    681  
-    682         :param screenNo: string 
-    683         :param codes: string - 종목코드 목록(각 종목은 세미콜론으로 구분됨) 
-    684         :param conditionName: string - 조건식 이름 
-    685         :param conditionIndex: int - 조건식 인덱스 
-    686         :param inquiry: int - 조회구분(0: 남은데이터 없음, 2: 남은데이터 있음) 
+    680         (1회성, 실시간) 종목 조건검색 요청시 발생되는 이벤트
+    681
+    682         :param screenNo: string
+    683         :param codes: string - 종목코드 목록(각 종목은 세미콜론으로 구분됨)
+    684         :param conditionName: string - 조건식 이름
+    685         :param conditionIndex: int - 조건식 인덱스
+    686         :param inquiry: int - 조회구분(0: 남은데이터 없음, 2: 남은데이터 있음)
     687         """
 
         logger.debug("[receiveTrCondition]")
@@ -352,12 +353,12 @@ class Kiwoom(QAxWidget):
 
     def _get_chejan_data(self, fid):
         """
-    865         주문접수, 주문체결, 잔고정보를 얻어오는 메서드 
-    866  
-    867         이 메서드는 receiveChejanData() 이벤트 메서드가 호출될 때 그 안에서 사용해야 합니다. 
-    868  
-    869         :param fid: int 
-    870         :return: string 
+    865         주문접수, 주문체결, 잔고정보를 얻어오는 메서드
+    866
+    867         이 메서드는 receiveChejanData() 이벤트 메서드가 호출될 때 그 안에서 사용해야 합니다.
+    868
+    869         :param fid: int
+    870         :return: string
     871         """
 
         if not isinstance(fid, int):
@@ -369,23 +370,23 @@ class Kiwoom(QAxWidget):
 
     def send_order(self, requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, originOrderNo):
         """
-    819         주식 주문 메서드 
-    820  
-    821         sendOrder() 메소드 실행시, 
-    822         OnReceiveMsg, OnReceiveTrData, OnReceiveChejanData 이벤트가 발생한다. 
-    823         이 중, 주문에 대한 결과 데이터를 얻기 위해서는 OnReceiveChejanData 이벤트를 통해서 처리한다. 
-    824         OnReceiveTrData 이벤트를 통해서는 주문번호를 얻을 수 있는데, 주문후 이 이벤트에서 주문번호가 ''공백으로 전달되면, 
-    825         주문접수 실패를 의미한다. 
-    826  
-    827         :param requestName: string - 주문 요청명(사용자 정의) 
-    828         :param screenNo: string - 화면번호(4자리) 
-    829         :param accountNo: string - 계좌번호(10자리) 
-    830         :param orderType: int - 주문유형(1: 신규매수, 2: 신규매도, 3: 매수취소, 4: 매도취소, 5: 매수정정, 6: 매도정정) 
-    831         :param code: string - 종목코드 
-    832         :param qty: int - 주문수량 
-    833         :param price: int - 주문단가 
-    834         :param hogaType: string - 거래구분(00: 지정가, 03: 시장가, 05: 조건부지정가, 06: 최유리지정가, 그외에는 api 문서참조) 
-    835         :param originOrderNo: string - 원주문번호(신규주문에는 공백, 정정및 취소주문시 원주문번호르 입력합니다.) 
+    819         주식 주문 메서드
+    820
+    821         sendOrder() 메소드 실행시,
+    822         OnReceiveMsg, OnReceiveTrData, OnReceiveChejanData 이벤트가 발생한다.
+    823         이 중, 주문에 대한 결과 데이터를 얻기 위해서는 OnReceiveChejanData 이벤트를 통해서 처리한다.
+    824         OnReceiveTrData 이벤트를 통해서는 주문번호를 얻을 수 있는데, 주문후 이 이벤트에서 주문번호가 ''공백으로 전달되면,
+    825         주문접수 실패를 의미한다.
+    826
+    827         :param requestName: string - 주문 요청명(사용자 정의)
+    828         :param screenNo: string - 화면번호(4자리)
+    829         :param accountNo: string - 계좌번호(10자리)
+    830         :param orderType: int - 주문유형(1: 신규매수, 2: 신규매도, 3: 매수취소, 4: 매도취소, 5: 매수정정, 6: 매도정정)
+    831         :param code: string - 종목코드
+    832         :param qty: int - 주문수량
+    833         :param price: int - 주문단가
+    834         :param hogaType: string - 거래구분(00: 지정가, 03: 시장가, 05: 조건부지정가, 06: 최유리지정가, 그외에는 api 문서참조)
+    835         :param originOrderNo: string - 원주문번호(신규주문에는 공백, 정정및 취소주문시 원주문번호르 입력합니다.)
     836         """
 
         if not self.get_connect_state():
@@ -470,13 +471,13 @@ class Kiwoom(QAxWidget):
 
     def _get_comm_real_data(self, code, fid):
         """
-    583         실시간 데이터 획득 메서드 
-    584  
-    585         이 메서드는 반드시 receiveRealData() 이벤트 메서드가 호출될 때, 그 안에서 사용해야 합니다. 
-    586  
-    587         :param code: string - 종목코드 
-    588         :param fid: - 실시간 타입에 포함된 fid 
-    589         :return: string - fid에 해당하는 데이터 
+    583         실시간 데이터 획득 메서드
+    584
+    585         이 메서드는 반드시 receiveRealData() 이벤트 메서드가 호출될 때, 그 안에서 사용해야 합니다.
+    586
+    587         :param code: string - 종목코드
+    588         :param fid: - 실시간 타입에 포함된 fid
+    589         :return: string - fid에 해당하는 데이터
     590         """
 
 
@@ -490,20 +491,20 @@ class Kiwoom(QAxWidget):
 
     def set_real_reg(self, screenNo, codes, fids, realRegType):
         """
-    602         실시간 데이터 요청 메서드 
-    603  
-    604         종목코드와 fid 리스트를 이용해서 실시간 데이터를 요청하는 메서드입니다. 
-    605         한번에 등록 가능한 종목과 fid 갯수는 100종목, 100개의 fid 입니다. 
-    606         실시간등록타입을 0으로 설정하면, 첫 실시간 데이터 요청을 의미하며 
-    607         실시간등록타입을 1로 설정하면, 추가등록을 의미합니다. 
-    608  
-    609         실시간 데이터는 실시간 타입 단위로 receiveRealData() 이벤트로 전달되기 때문에, 
-    610         이 메서드에서 지정하지 않은 fid 일지라도, 실시간 타입에 포함되어 있다면, 데이터 수신이 가능하다. 
-    611  
-    612         :param screenNo: string 
-    613         :param codes: string - 종목코드 리스트(종목코드;종목코드;...) 
-    614         :param fids: string - fid 리스트(fid;fid;...) 
-    615         :param realRegType: string - 실시간등록타입(0: 첫 등록, 1: 추가 등록) 
+    602         실시간 데이터 요청 메서드
+    603
+    604         종목코드와 fid 리스트를 이용해서 실시간 데이터를 요청하는 메서드입니다.
+    605         한번에 등록 가능한 종목과 fid 갯수는 100종목, 100개의 fid 입니다.
+    606         실시간등록타입을 0으로 설정하면, 첫 실시간 데이터 요청을 의미하며
+    607         실시간등록타입을 1로 설정하면, 추가등록을 의미합니다.
+    608
+    609         실시간 데이터는 실시간 타입 단위로 receiveRealData() 이벤트로 전달되기 때문에,
+    610         이 메서드에서 지정하지 않은 fid 일지라도, 실시간 타입에 포함되어 있다면, 데이터 수신이 가능하다.
+    611
+    612         :param screenNo: string
+    613         :param codes: string - 종목코드 리스트(종목코드;종목코드;...)
+    614         :param fids: string - fid 리스트(fid;fid;...)
+    615         :param realRegType: string - 실시간등록타입(0: 첫 등록, 1: 추가 등록)
     616         """
 
         if not self.get_connect_state():
@@ -521,12 +522,12 @@ class Kiwoom(QAxWidget):
 
     def set_real_remove(self, screenNo, code):
         """
-    632         실시간 데이터 중지 메서드 
-    633  
-    634         setRealReg() 메서드로 등록한 종목만, 이 메서드를 통해 실시간 데이터 받기를 중지 시킬 수 있습니다. 
-    635  
-    636         :param screenNo: string - 화면번호 또는 ALL 키워드 사용가능 
-    637         :param code: string - 종목코드 또는 ALL 키워드 사용가능 
+    632         실시간 데이터 중지 메서드
+    633
+    634         setRealReg() 메서드로 등록한 종목만, 이 메서드를 통해 실시간 데이터 받기를 중지 시킬 수 있습니다.
+    635
+    636         :param screenNo: string - 화면번호 또는 ALL 키워드 사용가능
+    637         :param code: string - 종목코드 또는 ALL 키워드 사용가능
     638         """
 
 

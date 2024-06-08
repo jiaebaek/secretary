@@ -591,8 +591,7 @@ if __name__ == "__main__":
             earning_rate = argument[3].strip('%')
             num = argument[4].strip('ea')
             for stock in trade.user_stock_list:
-                remain = int(stock['possession_num'])
-                # 1주 매도
+                remain = int(stock['available_num'])
                 trade.sell_manual_stock(stock, earning_rate, remain, num)
 
         if argument[1] == '5':
@@ -616,6 +615,15 @@ if __name__ == "__main__":
 
         ## ---------------------------------- auto ------------------------------------------ ##
 
+        if argument[1] == '0' or argument[1] == '2':
+            logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
+            for stock in trade.user_stock_list:
+                remain = int(stock['available_num'])
+                # 1주 매도
+                remain = trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
+            sleep(0.5)
+            trade.get_user_stock()
+
         if argument[1] == '0' or argument[1] == '1':
             trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
             logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
@@ -634,7 +642,7 @@ if __name__ == "__main__":
                 else:
                     logger.debug("물타기 제외 종목입니다 : {}".format(stock))
 
-            sleep(1)
+            sleep(0.5)
             trade.get_user_stock()
             
         if argument[1] == '0' or argument[1] == '3':
@@ -649,13 +657,13 @@ if __name__ == "__main__":
                 trade.set_buy_stock_num()
                 trade.buy_new_stock()
 
-                sleep(1)
+                sleep(0.5)
                 trade.get_user_stock()
 
         if argument[1] == '0' or argument[1] == '2':
             logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
             for stock in trade.user_stock_list:
-                remain = int(stock['possession_num'])
+                remain = int(stock['available_num'])
                 # 1주 매도
                 remain = trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
                 if remain:
