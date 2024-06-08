@@ -431,7 +431,25 @@ class Trading:
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
-        logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
+        logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
+        return remain - num
+
+    def _sell_2_stock_designated_price(self, stock, sell_earning_rate, remain):
+        if 'J' in stock['code']:
+            return
+
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit) + 1 # 올림
+        price = int(price * unit)
+        num = 2
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+                               num, price, HOGATYPE['지정가'], "")
+        sleep(0.5)
+        logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_designated_price_num(self, stock, sell_earning_rate, remain, num):
@@ -498,6 +516,16 @@ class Trading:
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount'])))
         return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
+
+    def sell_2_stock(self, stock, sell_earning_rate, remain):
+        # 매도#
+        # 지정 수익률 이상 가격으로 매도
+
+        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+                                                                               stock['earning_rate'],
+                                                                               int(stock['buy_price']),
+                                                                                int(stock['buy_amount'])))
+        return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain)
 
     def sell_manual_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
         # 매도#
@@ -630,6 +658,8 @@ if __name__ == "__main__":
                 remain = int(stock['possession_num'])
                 # 1주 매도
                 remain = trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
+                if remain:
+                    remain = trade.sell_2_stock(stock, trade.sell_1_stock_earning_rate + 1, remain)
                 if remain:
                     remain = trade.sell_user_stock(stock, trade.sell_earning_rate[0], remain, trade.sell_stock_amount_1)
                 if remain:
