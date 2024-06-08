@@ -30,7 +30,7 @@ STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
 BUY_NEW_STOCK = "신규종목매수"
 
-TR_REQ_TIME_INTERVAL = 0.2
+TR_REQ_TIME_INTERVAL = 0.3
 
 ORDERTYPE = {'신규매수': 1, '신규매도': 2, '매수취소': 3, '매도취소': 4}
 HOGATYPE = {'지정가': "00", '시장가': "03"}
@@ -467,8 +467,7 @@ class Trading:
         logger.debug("### 1주 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_1_stock_earning_rate, stock['name'], stock['earning_rate'], int(stock['buy_price']),
                                                                                int(stock['buy_amount'])))
 
-        if float(stock["earning_rate"]) <= self.rebuy_1_stock_earning_rate + 2:
-            self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
+        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
 
     def rebuy_manual_stock(self, stock, earning_rate, buy_stock_num):
         # 물타기 매수#
@@ -638,7 +637,6 @@ if __name__ == "__main__":
                 if remain:
                     remain = trade.sell_user_stock(stock, trade.sell_earning_rate[2], remain, trade.sell_stock_amount_3)
                 logger.debug("남은 주식 수 : {}".format(remain))
-
 
 
     except Exception as err:
