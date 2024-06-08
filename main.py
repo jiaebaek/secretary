@@ -517,6 +517,16 @@ class Trading:
                                                                                 int(stock['buy_amount'])))
         return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
 
+    def sell_current_1_stock(self, stock, remain):
+        # 매도#
+        # 지정 수익률 이상 가격으로 매도
+
+        logger.debug("### 1주 현재가 매도 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(stock['name'],
+                                                                               stock['earning_rate'],
+                                                                               int(stock['buy_price']),
+                                                                                int(stock['buy_amount'])))
+        return self._sell_1_stock_current_price(stock, remain)
+
     def sell_2_stock(self, stock, sell_earning_rate, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
@@ -615,12 +625,13 @@ if __name__ == "__main__":
 
         ## ---------------------------------- auto ------------------------------------------ ##
 
-        if argument[1] == '0' or argument[1] == '2':
-            logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
+        if argument[1] == '0':
+            logger.debug('>>>>>>>>>>>> 일괄 현재가 매도 <<<<<<<<<<<<<<')
             for stock in trade.user_stock_list:
-                remain = int(stock['available_num'])
-                # 1주 매도
-                remain = trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
+                if float(stock["earning_rate"]) >= trade.sell_1_stock_earning_rate + 0.5:
+                    remain = int(stock['available_num'])
+                    # 1주 매도
+                    remain = trade.sell_current_1_stock(stock, remain)
             sleep(0.5)
             trade.get_user_stock()
 
