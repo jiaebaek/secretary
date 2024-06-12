@@ -188,6 +188,7 @@ class Trading:
         stocks_set = set(self.interesting_stocks)
         self.interesting_stocks = list(stocks_set)
         logger.debug(len(self.interesting_stocks))
+        logger.debug(self.interesting_stocks)
 
     def get_current_price(self, code):
         self.kiwoom.set_input_value("종목코드", code)
@@ -263,9 +264,12 @@ class Trading:
         if self.user_stock_num < self.buy_new_stock_num:
             buy_cnt = 0
             bought_key = []
-            while buy_cnt + self.user_stock_num < self.buy_new_stock_num:
-                # 매수할 종목 랜덤으로 선택
-                key = random.randrange(0, len(self.interesting_stocks))
+            # 관심종목을 랜덤으로 정렬
+            random.shuffle(self.interesting_stocks)
+            logger.debug(self.interesting_stocks)
+            for key in range(len(self.interesting_stocks)):
+                if buy_cnt + self.user_stock_num >= self.buy_new_stock_num:
+                    break
                 # 해당 종목이 이미 보유중인지 확인
                 if self.is_stock_in_user_stock(self.interesting_stocks[key]) \
                         or self.is_stock_in_not_done_order(self.interesting_stocks[key])\
