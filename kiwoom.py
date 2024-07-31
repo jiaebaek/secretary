@@ -407,7 +407,11 @@ class Kiwoom(QAxWidget):
                                       [requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, originOrderNo])
 
         if return_code != ReturnCode.OP_ERR_NONE:
-            raise Exception("sendOrder(): " + ReturnCode.CAUSE[return_code])
+            logger.debug((f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}"))
+            #raise Exception(f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}")
+        else:
+            logger.debug((f"sendOrder({code}, {qty}, {price}): Return Code is None"))
+            #raise Exception(f"sendOrder({code}, {qty}, {price}): Return Code is None")
 
         # receiveTrData() 에서 루프종료
         self.order_loop = QEventLoop()

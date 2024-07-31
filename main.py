@@ -188,7 +188,6 @@ class Trading:
         stocks_set = set(self.interesting_stocks)
         self.interesting_stocks = list(stocks_set)
         logger.debug(len(self.interesting_stocks))
-        logger.debug(self.interesting_stocks)
 
     def get_current_price(self, code):
         self.kiwoom.set_input_value("종목코드", code)
@@ -266,7 +265,6 @@ class Trading:
             bought_key = []
             # 관심종목을 랜덤으로 정렬
             random.shuffle(self.interesting_stocks)
-            logger.debug(self.interesting_stocks)
             for key in range(len(self.interesting_stocks)):
                 if buy_cnt + self.user_stock_num >= self.buy_new_stock_num:
                     break
@@ -305,6 +303,7 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -379,6 +378,9 @@ class Trading:
             num = 1
         if num > remain:
             num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -400,6 +402,9 @@ class Trading:
             num = 1
         if num > remain:
             num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -414,6 +419,11 @@ class Trading:
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
         price, name = self.get_current_price(stock['code'])
         num = 1
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -432,6 +442,11 @@ class Trading:
         price = int(price / unit) + 1 # 올림
         price = int(price * unit)
         num = 1
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -450,6 +465,11 @@ class Trading:
         price = int(price / unit) + 1 # 올림
         price = int(price * unit)
         num = 2
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -468,6 +488,9 @@ class Trading:
         price = int(price * unit)
         if num > remain:
             num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
@@ -504,10 +527,11 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
-                                                                                int(stock['buy_amount'])))
+                                                                                int(stock['buy_amount']),
+                                                                                int(stock['available_num'])))
 
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
@@ -515,40 +539,44 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
-                                                                                int(stock['buy_amount'])))
+                                                                                int(stock['buy_amount']),
+                                                                                int(stock['available_num'])))
         return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
 
     def sell_current_1_stock(self, stock, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 1주 현재가 매도 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(stock['name'],
+        logger.debug("### 1주 현재가 매도 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
-                                                                                int(stock['buy_amount'])))
+                                                                                int(stock['buy_amount']),
+                                                                                int(stock['available_num'])))
         return self._sell_1_stock_current_price(stock, remain)
 
     def sell_2_stock(self, stock, sell_earning_rate, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
-                                                                                int(stock['buy_amount'])))
+                                                                                int(stock['buy_amount']),
+                                                                                int(stock['available_num'])))
         return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain)
 
     def sell_manual_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 ###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
-                                                                                int(stock['buy_amount'])))
+                                                                                int(stock['buy_amount']),
+                                                                                int(stock['available_num'])))
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
