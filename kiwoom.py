@@ -406,12 +406,13 @@ class Kiwoom(QAxWidget):
         return_code = self.dynamicCall("SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                                       [requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, originOrderNo])
 
-        if return_code != ReturnCode.OP_ERR_NONE:
-            logger.debug((f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}"))
-            #raise Exception(f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}")
-        else:
+        if return_code == None:
             logger.debug((f"sendOrder({code}, {qty}, {price}): Return Code is None"))
             #raise Exception(f"sendOrder({code}, {qty}, {price}): Return Code is None")
+        elif return_code != ReturnCode.OP_ERR_NONE:
+            logger.debug((f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}"))
+            #raise Exception(f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}")
+
 
         # receiveTrData() 에서 루프종료
         self.order_loop = QEventLoop()
