@@ -30,7 +30,7 @@ STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
 BUY_NEW_STOCK = "신규종목매수"
 
-TR_REQ_TIME_INTERVAL = 0.3
+TR_REQ_TIME_INTERVAL = 0.6
 
 ORDERTYPE = {'신규매수': 1, '신규매도': 2, '매수취소': 3, '매도취소': 4}
 HOGATYPE = {'지정가': "00", '시장가': "03"}
@@ -282,7 +282,7 @@ class Trading:
                 if self._buy_designated_price(self.interesting_stocks[key], self.buy_new_stock_amount, -1, price):
                     buy_cnt += 1
                 logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-                sleep(0.5)
+                sleep(0.7)
         else:
             logger.debug('보유주식이 {}개이므로 더이상 신규매수할수 없습니다.'.format(self.user_stock_num))
 
@@ -306,7 +306,7 @@ class Trading:
 
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
         return True
 
@@ -324,7 +324,7 @@ class Trading:
             return False
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
         return True
 
@@ -351,7 +351,7 @@ class Trading:
             return False
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         return True
 
@@ -383,7 +383,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -407,7 +407,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -426,7 +426,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -449,7 +449,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -472,7 +472,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -493,7 +493,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -531,7 +531,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
-                                                                                int(stock['available_num'])))
+                                                                                remain))
 
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
@@ -543,7 +543,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
-                                                                                int(stock['available_num'])))
+                                                                                remain))
         return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain)
 
     def sell_current_1_stock(self, stock, remain):
@@ -554,7 +554,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
-                                                                                int(stock['available_num'])))
+                                                                                remain))
         return self._sell_1_stock_current_price(stock, remain)
 
     def sell_2_stock(self, stock, sell_earning_rate, remain):
@@ -565,7 +565,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
-                                                                                int(stock['available_num'])))
+                                                                                remain))
         return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain)
 
     def sell_manual_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
@@ -576,7 +576,7 @@ class Trading:
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
-                                                                                int(stock['available_num'])))
+                                                                                remain))
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
@@ -657,17 +657,7 @@ if __name__ == "__main__":
 
         ## ---------------------------------- auto ------------------------------------------ ##
 
-        if argument[1] == '0':
-            logger.debug('>>>>>>>>>>>> 일괄 현재가 매도 <<<<<<<<<<<<<<')
-            for stock in trade.user_stock_list:
-                if float(stock["earning_rate"]) >= trade.sell_1_stock_earning_rate + 0.5:
-                    remain = int(stock['available_num'])
-                    # 1주 매도
-                    remain = trade.sell_current_1_stock(stock, remain)
-            sleep(0.5)
-            trade.get_user_stock()
-
-        if argument[1] == '0' or argument[1] == '1':
+        if argument[1] == '1':
             trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
             logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
             logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
@@ -688,7 +678,7 @@ if __name__ == "__main__":
             sleep(0.5)
             trade.get_user_stock()
             
-        if argument[1] == '0' or argument[1] == '3':
+        if argument[1] == '3':
             if trade.new_buy_stock == 1:
                 # 사용자 관심종목으로 부터 리스트 가져오기
                 trade.get_interesting_stock()
@@ -708,9 +698,10 @@ if __name__ == "__main__":
             for stock in trade.user_stock_list:
                 remain = int(stock['available_num'])
                 # 1주 매도
-                remain = trade.sell_1_stock(stock, trade.sell_1_stock_earning_rate, remain)
-                if remain:
-                    remain = trade.sell_2_stock(stock, trade.sell_1_stock_earning_rate + 1, remain)
+                for i in range(trade.sell_1_stock_earning_rate):
+                    earning_rate = i + 1
+                    if remain:
+                        remain = trade.sell_1_stock(stock, earning_rate, remain)
                 if remain:
                     remain = trade.sell_user_stock(stock, trade.sell_earning_rate[0], remain, trade.sell_stock_amount_1)
                 if remain:
