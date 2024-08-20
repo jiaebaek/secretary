@@ -290,6 +290,9 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
+        if '*' in stock['name']:
+            return
+
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         # num = int(buy_amount / price)
@@ -314,6 +317,9 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
+        if '*' in stock['name']:
+            return
+
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         if buy_amount: # 보유금액
@@ -332,6 +338,9 @@ class Trading:
         # 수익률(earning_rate) 지정가로 예약 매수
         if 'J' in stock_code:
             return
+        if '*' in stock['name']:
+            return
+
         price = int(base_price) * (1 + ((earning_rate) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -371,6 +380,9 @@ class Trading:
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
+        if '*' in stock['name']:
+            return
+
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
         price, name = self.get_current_price(stock['code'])
         num = int(sell_stock_amount / price)
@@ -390,6 +402,9 @@ class Trading:
     def _sell_designated_price(self, stock, sell_earning_rate, remain, sell_stock_amount):
         if 'J' in stock['code']:
             return
+        if '*' in stock['name']:
+            return
+
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -416,6 +431,9 @@ class Trading:
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
+        if '*' in stock['name']:
+            return
+
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
         price, name = self.get_current_price(stock['code'])
         num = 1
@@ -432,6 +450,8 @@ class Trading:
 
     def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
+            return
+        if '*' in stock['name']:
             return
 
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
@@ -456,6 +476,8 @@ class Trading:
     def _sell_2_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
             return
+        if '*' in stock['name']:
+            return
 
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
         for pr, un in HOGAUNIT.items():
@@ -478,6 +500,8 @@ class Trading:
 
     def _sell_designated_price_num(self, stock, sell_earning_rate, remain, num):
         if 'J' in stock['code']:
+            return
+        if '*' in stock['name']:
             return
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
         for pr, un in HOGAUNIT.items():
