@@ -11,26 +11,36 @@ import os
 ORDER_INTERVAL = "주문간격(초)"  # 주문 간격
 BUY_NEW_STOCK_AMOUNT = "신규매수주식금액"  # 신규매수 주식 금액
 REBUY_STOCK_AMOUNT = "물타기매수주식금액"  # 물타기매수 주식 금액
-SELL_STOCK_AMOUNT = "1차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_1 = "1차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_2 = "2차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_3 = "3차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_4 = "4차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_5 = "5차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_6 = "6차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_7 = "7차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_8 = "8차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_9 = "7차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_10 = "8차 매도주식금액"  # 매도 주식 금액
 REBUY_EARNING_RATE = "물타기 기준(%)"  # 물타기 기준
 REBUY_1_STOCK_EARNING_RATE = "1주 매수 기준(%)" # 1주 매수 기준
-SELL_EARNING_RATE = "매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_1 = "1차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_2 = "2차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_3 = "3차 매도 기준(%)"  # 매도 기준
-SELL_1_STOCK_EARNING_RATE = "1주 매도 기준(%)" # 1주 매도 기준
+SELL_EARNING_RATE_4 = "4차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_5 = "5차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_6 = "6차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_7 = "7차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_8 = "8차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_9 = "7차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_10 = "8차 매도 기준(%)"  # 매도 기준
 SELL_ALL_EARNING_RATE = 10  # 사용안함
 MAX_AMOUNT = "종목별 매수 최대 금액(원)"  # 종목별 매수 최대 금액
-REMAIN_MONEY_BUY_NEW_STOCK_UP_RATE = {30000000: 200,
-                                      10000000: 150}  # 예수금: 종목갯수 ( 예수금 이상일 때 종목갯수만큼 보유종목 유지)
-REMAIN_MONEY_BUY_NEW_STOCK_DOWN_RATE = {10000000: 100}  # 예수금: 종목갯수 ( 예수금 이하일 때 종목갯수만큼 보유종목 유지)
 DEFAULT_BUY_NEW_STOCK_NUM = "기본 보유종목 개수"  # 기본 보유종목 갯수
 STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
 BUY_NEW_STOCK = "신규종목매수"
 
-TR_REQ_TIME_INTERVAL = 0.6
+TR_REQ_TIME_INTERVAL = 0.3
 
 ORDERTYPE = {'신규매수': 1, '신규매도': 2, '매수취소': 3, '매도취소': 4}
 HOGATYPE = {'지정가': "00", '시장가': "03"}
@@ -53,12 +63,9 @@ class Trading:
         self.order_interval = 150
         self.buy_new_stock_amount = 300000
         self.rebuy_stock_amount = 300000
-        self.sell_stock_amount_1 = 320000
-        self.sell_stock_amount_2 = 620000
-        self.sell_stock_amount_3 = 820000
+        self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
-        self.sell_earning_rate = [4, 8, 12]
-        self.sell_1_stock_earning_rate = 3
+        self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
         self.default_buy_new_stock_num = 100
@@ -98,22 +105,8 @@ class Trading:
                 self.buy_new_stock_amount = row[1]
             elif row[2] == REBUY_STOCK_AMOUNT:
                 self.rebuy_stock_amount = row[1]
-            elif row[2] == SELL_STOCK_AMOUNT:
-                self.sell_stock_amount_1 = row[1]
-            elif row[2] == SELL_STOCK_AMOUNT_2:
-                self.sell_stock_amount_2 = row[1]
-            elif row[2] == SELL_STOCK_AMOUNT_3:
-                self.sell_stock_amount_3 = row[1]
             elif row[2] == REBUY_EARNING_RATE:
                 self.rebuy_earning_rate = row[1]
-            elif row[2] == SELL_EARNING_RATE:
-                self.sell_earning_rate[0] = row[1]
-            elif row[2] == SELL_EARNING_RATE_2:
-                self.sell_earning_rate[1] = row[1]
-            elif row[2] == SELL_EARNING_RATE_3:
-                self.sell_earning_rate[2] = row[1]
-            elif row[2] == SELL_1_STOCK_EARNING_RATE:
-                self.sell_1_stock_earning_rate = row[1]
             elif row[2] == REBUY_1_STOCK_EARNING_RATE:
                 self.rebuy_1_stock_earning_rate = row[1]
             elif row[2] == MAX_AMOUNT:
@@ -126,7 +119,53 @@ class Trading:
                 self.except_rebuy_list = row[1].split('/')
             elif row[2] == BUY_NEW_STOCK:
                 self.new_buy_stock = row[1]
-
+                
+        cur.execute("select * from 매도설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == SELL_EARNING_RATE_1:
+                self.sell_earning_rate[0] = row[1]
+            elif row[0] == SELL_EARNING_RATE_2:
+                self.sell_earning_rate[1] = row[1]
+            elif row[0] == SELL_EARNING_RATE_3:
+                self.sell_earning_rate[2] = row[1]
+            elif row[0] == SELL_EARNING_RATE_4:
+                self.sell_earning_rate[3] = row[1]
+            elif row[0] == SELL_EARNING_RATE_5:
+                self.sell_earning_rate[4] = row[1]
+            elif row[0] == SELL_EARNING_RATE_6:
+                self.sell_earning_rate[5] = row[1]
+            elif row[0] == SELL_EARNING_RATE_7:
+                self.sell_earning_rate[6] = row[1]
+            elif row[0] == SELL_EARNING_RATE_8:
+                self.sell_earning_rate[7] = row[1]
+            elif row[0] == SELL_EARNING_RATE_9:
+                self.sell_earning_rate[8] = row[1]
+            elif row[0] == SELL_EARNING_RATE_10:
+                self.sell_earning_rate[9] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_1:
+                self.sell_stock_amount[0] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_2:
+                self.sell_stock_amount[1] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_3:
+                self.sell_stock_amount[2] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_4:
+                self.sell_stock_amount[3] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_5:
+                self.sell_stock_amount[4] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_6:
+                self.sell_stock_amount[5] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_7:
+                self.sell_stock_amount[6] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_8:
+                self.sell_stock_amount[7] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_9:
+                self.sell_stock_amount[8] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_10:
+                self.sell_stock_amount[9] = row[1]
+            
         cur.execute("select * from secretary_stockdownrate")
         rows = cur.fetchall()
         for row in rows:
@@ -165,6 +204,7 @@ class Trading:
 
         logger.debug('user stock cnt : {}'.format(self.user_stock_num))
         logger.debug(self.user_stock_list)
+
 
     def get_user_remain(self):
         # 예수금 조회
@@ -265,6 +305,7 @@ class Trading:
             bought_key = []
             # 관심종목을 랜덤으로 정렬
             random.shuffle(self.interesting_stocks)
+            logger.debug(self.interesting_stocks)
             for key in range(len(self.interesting_stocks)):
                 if buy_cnt + self.user_stock_num >= self.buy_new_stock_num:
                     break
@@ -282,7 +323,7 @@ class Trading:
                 if self._buy_designated_price(self.interesting_stocks[key], self.buy_new_stock_amount, -1, price):
                     buy_cnt += 1
                 logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-                sleep(0.7)
+                sleep(0.5)
         else:
             logger.debug('보유주식이 {}개이므로 더이상 신규매수할수 없습니다.'.format(self.user_stock_num))
 
@@ -290,9 +331,10 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
+        if '(폐)파나케이아' == stock['name']:
+            return
         if '*' in stock['name']:
             return
-
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         # num = int(buy_amount / price)
@@ -306,7 +348,6 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
-
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.7)
@@ -317,9 +358,10 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
+        if '(폐)파나케이아' == stock['name']:
+            return
         if '*' in stock['name']:
             return
-
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         if buy_amount: # 보유금액
@@ -330,13 +372,15 @@ class Trading:
             return False
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
         return True
 
     def _buy_designated_price(self, stock_code, amount, earning_rate, base_price, buy_amount=None):
         # 수익률(earning_rate) 지정가로 예약 매수
         if 'J' in stock_code:
+            return
+        if '(폐)파나케이아' == stock['name']:
             return
         if '*' in stock['name']:
             return
@@ -380,6 +424,10 @@ class Trading:
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
 
@@ -395,13 +443,17 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_designated_price(self, stock, sell_earning_rate, remain, sell_stock_amount):
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
 
@@ -422,7 +474,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -431,6 +483,10 @@ class Trading:
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
 
@@ -444,13 +500,17 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
 
@@ -469,13 +529,17 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_2_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
 
@@ -484,7 +548,7 @@ class Trading:
             if price < pr:
                 unit = un
                 break
-        price = int(price / unit) + 1 # 올림
+        price = int(price / unit) + 1  # 올림
         price = int(price * unit)
         num = 2
         if num > remain:
@@ -494,15 +558,20 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_designated_price_num(self, stock, sell_earning_rate, remain, num):
         if 'J' in stock['code']:
             return
+
+        if '(폐)파나케이아' == stock['name']:
+            return
+
         if '*' in stock['name']:
             return
+
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -517,7 +586,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -533,10 +602,15 @@ class Trading:
     def rebuy_1_stock(self, stock):
         # 물타기 매수#
 
-        logger.debug("### 1주 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_1_stock_earning_rate, stock['name'], stock['earning_rate'], int(stock['buy_price']),
-                                                                               int(stock['buy_amount'])))
+        logger.debug(
+            "### 1주 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_1_stock_earning_rate,
+                                                                                      stock['name'],
+                                                                                      stock['earning_rate'],
+                                                                                      int(stock['buy_price']),
+                                                                                      int(stock['buy_amount'])))
 
-        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
+        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'],
+                                   int(stock['buy_amount']))
 
     def rebuy_manual_stock(self, stock, earning_rate, buy_stock_num):
         # 물타기 매수#
@@ -551,19 +625,20 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 매도 기준 : {}% 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                 stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
                                                                                 remain))
-
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
     def sell_1_stock(self, stock, sell_earning_rate, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                 stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
@@ -585,7 +660,8 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                 stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
@@ -596,7 +672,8 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                 stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
@@ -615,7 +692,7 @@ if __name__ == "__main__":
             now_tupule = now.timetuple()
             logger.debug(now_tupule)
             while now_tupule.tm_hour < 9:
-                sleep(60)
+                sleep(100)
                 now = datetime.datetime.now()
                 now_tupule = now.timetuple()
                 logger.debug(now_tupule)
@@ -646,7 +723,7 @@ if __name__ == "__main__":
         logger.debug('주식정보 가져오기')
         trade.get_user_stock()
 
-        with open("D:\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
+        with open("C:\\Users\\deser\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
             wr = csv.writer(f)
             wr.writerow(["{}".format(datetime.datetime.today().strftime("%Y/%m/%d")), "{}".format(trade.user_stock_num)])
 
@@ -658,6 +735,7 @@ if __name__ == "__main__":
             num = argument[4].strip('ea')
             for stock in trade.user_stock_list:
                 remain = int(stock['available_num'])
+                # 1주 매도
                 trade.sell_manual_stock(stock, earning_rate, remain, num)
 
         if argument[1] == '5':
@@ -721,26 +799,26 @@ if __name__ == "__main__":
             logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
             for stock in trade.user_stock_list:
                 remain = int(stock['available_num'])
-                # 1주 매도
-                for i in range(trade.sell_1_stock_earning_rate):
-                    earning_rate = i + 1
-                    if remain:
-                        remain = trade.sell_1_stock(stock, earning_rate, remain)
+                # 주단위 매도
                 if remain:
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[0], remain, trade.sell_stock_amount_1)
+                    remain = trade.sell_1_stock(stock, 1, remain)   # 1%에 주식 1개
                 if remain:
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[1], remain, trade.sell_stock_amount_2)
-                if remain:
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[2], remain, trade.sell_stock_amount_3)
+                    remain = trade.sell_2_stock(stock, 2, remain)   # 2%에 주식 2개
+                for i in range(len(trade.sell_earning_rate)):
+                    if trade.sell_earning_rate[i] == 0:
+                        break
+                    if remain == 0:
+                        break
+                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain, trade.sell_stock_amount[i])
                 logger.debug("남은 주식 수 : {}".format(remain))
-
 
     except Exception as err:
         logger.exception(err)
 
     if argument[1] in ['0', '1', '2', '3']:
+        logger.debug("######## 완료 ########")
         os.system("taskkill /im KaKaoTalk.exe")
-        os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
+        os.system("C:\\Users\\deser\\PycharmProjects\\secretary\\카카오톡.lnk")
 
     '''
 
