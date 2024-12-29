@@ -19,8 +19,8 @@ SELL_STOCK_AMOUNT_5 = "5차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_6 = "6차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_7 = "7차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_8 = "8차 매도주식금액"  # 매도 주식 금액
-SELL_STOCK_AMOUNT_9 = "7차 매도주식금액"  # 매도 주식 금액
-SELL_STOCK_AMOUNT_10 = "8차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_9 = "9차 매도주식금액"  # 매도 주식 금액
+SELL_STOCK_AMOUNT_10 = "10차 매도주식금액"  # 매도 주식 금액
 REBUY_EARNING_RATE = "물타기 기준(%)"  # 물타기 기준
 REBUY_1_STOCK_EARNING_RATE = "1주 매수 기준(%)" # 1주 매수 기준
 SELL_EARNING_RATE_1 = "1차 매도 기준(%)"  # 매도 기준
@@ -31,8 +31,9 @@ SELL_EARNING_RATE_5 = "5차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_6 = "6차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_7 = "7차 매도 기준(%)"  # 매도 기준
 SELL_EARNING_RATE_8 = "8차 매도 기준(%)"  # 매도 기준
-SELL_EARNING_RATE_9 = "7차 매도 기준(%)"  # 매도 기준
-SELL_EARNING_RATE_10 = "8차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_9 = "9차 매도 기준(%)"  # 매도 기준
+SELL_EARNING_RATE_10 = "10차 매도 기준(%)"  # 매도 기준
+SELL_1_STOCK_EARNING_RATE = "1주 매도 기준(%)" # 1주 매도 기준
 SELL_ALL_EARNING_RATE = 10  # 사용안함
 MAX_AMOUNT = "종목별 매수 최대 금액(원)"  # 종목별 매수 최대 금액
 DEFAULT_BUY_NEW_STOCK_NUM = "기본 보유종목 개수"  # 기본 보유종목 갯수
@@ -66,6 +67,7 @@ class Trading:
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.sell_credit_earning_rate = [0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
         self.default_buy_new_stock_num = 100
@@ -107,6 +109,8 @@ class Trading:
                 self.rebuy_stock_amount = row[1]
             elif row[2] == REBUY_EARNING_RATE:
                 self.rebuy_earning_rate = row[1]
+            elif row[2] == SELL_1_STOCK_EARNING_RATE:
+                self.sell_1_stock_earning_rate = row[1]
             elif row[2] == REBUY_1_STOCK_EARNING_RATE:
                 self.rebuy_1_stock_earning_rate = row[1]
             elif row[2] == MAX_AMOUNT:
@@ -119,7 +123,7 @@ class Trading:
                 self.except_rebuy_list = row[1].split('/')
             elif row[2] == BUY_NEW_STOCK:
                 self.new_buy_stock = row[1]
-                
+
         cur.execute("select * from 매도설정")
         rows = cur.fetchall()
         for row in rows:
@@ -165,7 +169,15 @@ class Trading:
                 self.sell_stock_amount[8] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_10:
                 self.sell_stock_amount[9] = row[1]
-            
+
+        cur.execute("select * from 신용매도설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == SELL_EARNING_RATE_1:
+                self.sell_credit_earning_rate[0] = row[1]
+
         cur.execute("select * from secretary_stockdownrate")
         rows = cur.fetchall()
         for row in rows:
@@ -205,6 +217,29 @@ class Trading:
         logger.debug('user stock cnt : {}'.format(self.user_stock_num))
         logger.debug(self.user_stock_list)
 
+    def get_user_credit_stock(self):
+        # 사용자 계정의 보유 신용 주식 개수 확인
+        self.account = self.kiwoom.get_login_info()
+        self.account = self.account.split(';')[0]
+        logger.debug('계좌번호 : {}'.format(self.account))
+
+        self.kiwoom.set_input_value("계좌번호", self.account)
+        self.kiwoom.set_input_value("조회구분", 2)
+        self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
+        self.user_stock_num = self.kiwoom.ret_cnt
+        self.user_stock_list = self.kiwoom.ret_multi_data
+
+        while self.kiwoom.remained_data:
+            logger.debug("다음 잔고조회")
+            sleep(TR_REQ_TIME_INTERVAL)
+            self.kiwoom.set_input_value("계좌번호", self.account)
+            self.kiwoom.set_input_value("조회구분", 2)
+            self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 2, "0101")
+            self.user_stock_num += self.kiwoom.ret_cnt
+            self.user_stock_list.extend(self.kiwoom.ret_multi_data)
+
+        logger.debug('user stock cnt : {}'.format(self.user_stock_num))
+        logger.debug(self.user_stock_list)
 
     def get_user_remain(self):
         # 예수금 조회
@@ -305,7 +340,6 @@ class Trading:
             bought_key = []
             # 관심종목을 랜덤으로 정렬
             random.shuffle(self.interesting_stocks)
-            logger.debug(self.interesting_stocks)
             for key in range(len(self.interesting_stocks)):
                 if buy_cnt + self.user_stock_num >= self.buy_new_stock_num:
                     break
@@ -331,10 +365,7 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
-        if '(폐)파나케이아' == stock['name']:
-            return
-        if '*' in stock['name']:
-            return
+
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         # num = int(buy_amount / price)
@@ -348,6 +379,7 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.7)
@@ -358,10 +390,7 @@ class Trading:
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
-        if '(폐)파나케이아' == stock['name']:
-            return
-        if '*' in stock['name']:
-            return
+
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
         if buy_amount: # 보유금액
@@ -379,10 +408,6 @@ class Trading:
     def _buy_designated_price(self, stock_code, amount, earning_rate, base_price, buy_amount=None):
         # 수익률(earning_rate) 지정가로 예약 매수
         if 'J' in stock_code:
-            return
-        if '(폐)파나케이아' == stock['name']:
-            return
-        if '*' in stock['name']:
             return
 
         price = int(base_price) * (1 + ((earning_rate) / 100))
@@ -404,7 +429,7 @@ class Trading:
             return False
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(0.5)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         return True
 
@@ -423,12 +448,6 @@ class Trading:
             logger.debug("### 전량 매도!! 수량 : {}".format(num))'''
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
-            return
-
-        if '(폐)파나케이아' == stock['name']:
-            return
-
-        if '*' in stock['name']:
             return
 
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
@@ -451,12 +470,6 @@ class Trading:
         if 'J' in stock['code']:
             return
 
-        if '(폐)파나케이아' == stock['name']:
-            return
-
-        if '*' in stock['name']:
-            return
-
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -474,7 +487,7 @@ class Trading:
             return remain - num
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(0.7)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -482,12 +495,6 @@ class Trading:
         # 매도#
         # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
-            return
-
-        if '(폐)파나케이아' == stock['name']:
-            return
-
-        if '*' in stock['name']:
             return
 
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
@@ -506,12 +513,6 @@ class Trading:
 
     def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain):
         if 'J' in stock['code']:
-            return
-
-        if '(폐)파나케이아' == stock['name']:
-            return
-
-        if '*' in stock['name']:
             return
 
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
@@ -537,18 +538,12 @@ class Trading:
         if 'J' in stock['code']:
             return
 
-        if '(폐)파나케이아' == stock['name']:
-            return
-
-        if '*' in stock['name']:
-            return
-
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
                 break
-        price = int(price / unit) + 1  # 올림
+        price = int(price / unit) + 1 # 올림
         price = int(price * unit)
         num = 2
         if num > remain:
@@ -566,13 +561,29 @@ class Trading:
         if 'J' in stock['code']:
             return
 
-        if '(폐)파나케이아' == stock['name']:
-            return
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100)) # 0.5 = 수수료
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit) + 1
+        price = int(price * unit)
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+                               num, price, HOGATYPE['지정가'], "")
+        sleep(0.5)
+        logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
+        return remain - num
 
-        if '*' in stock['name']:
+    def _sell_credit_designated_price_num(self, stock, sell_earning_rate, remain, num):
+        if 'J' in stock['code']:
             return
-
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
+        interest = float(stock['interest']) / int(stock['possession_num'])
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100)) + interest # 0.5 = 수수료
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
@@ -609,8 +620,7 @@ class Trading:
                                                                                       int(stock['buy_price']),
                                                                                       int(stock['buy_amount'])))
 
-        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'],
-                                   int(stock['buy_amount']))
+        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
 
     def rebuy_manual_stock(self, stock, earning_rate, buy_stock_num):
         # 물타기 매수#
@@ -625,20 +635,19 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}% 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
-                                                                                                 stock['name'],
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
                                                                                 remain))
+
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount)
 
     def sell_1_stock(self, stock, sell_earning_rate, remain):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
-                                                                                                 stock['name'],
+        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
@@ -660,20 +669,30 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
-                                                                                                 stock['name'],
+        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
                                                                                 remain))
         return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain)
 
+    def sell_manual_credit_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
+        # 매도#
+        # 지정 수익률 이상 가격으로 매도
+
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+                                                                               stock['earning_rate'],
+                                                                               int(stock['buy_price']),
+                                                                                int(stock['buy_amount']),
+                                                                                remain))
+
+        return self._sell_credit_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
+
     def sell_manual_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
-                                                                                                 stock['name'],
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
                                                                                stock['earning_rate'],
                                                                                int(stock['buy_price']),
                                                                                 int(stock['buy_amount']),
@@ -692,7 +711,7 @@ if __name__ == "__main__":
             now_tupule = now.timetuple()
             logger.debug(now_tupule)
             while now_tupule.tm_hour < 9:
-                sleep(100)
+                sleep(60)
                 now = datetime.datetime.now()
                 now_tupule = now.timetuple()
                 logger.debug(now_tupule)
@@ -720,105 +739,131 @@ if __name__ == "__main__":
         logger.debug('DB 접속')
         trade.update_options()
 
-        logger.debug('주식정보 가져오기')
-        trade.get_user_stock()
-
-        with open("C:\\Users\\deser\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
-            wr = csv.writer(f)
-            wr.writerow(["{}".format(datetime.datetime.today().strftime("%Y/%m/%d")), "{}".format(trade.user_stock_num)])
-
-        ## ---------------------------------- manual ------------------------------------------ ##
-
-        if argument[1] == '4':
-            logger.debug('>>>>>>>>>>>> 수동 매도 <<<<<<<<<<<<<<')
-            earning_rate = argument[3].strip('%')
-            num = argument[4].strip('ea')
-            for stock in trade.user_stock_list:
-                remain = int(stock['available_num'])
-                # 1주 매도
-                trade.sell_manual_stock(stock, earning_rate, remain, num)
-
-        if argument[1] == '5':
-            logger.debug('>>>>>>>>>>>>수동 매수 <<<<<<<<<<<<<<')
-            trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-            logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
-            earning_rate = argument[3].strip('%')
-            num = argument[4].strip('ea')
-            for i in range(len(trade.user_stock_list)):
-                # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
-                stock = trade.user_stock_list[i]
-                buy_amount = int(stock['buy_amount'])
-                if buy_amount > trade.max_amount:
-                    logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
-                                                                                       trade.max_amount))
-                    continue
-                if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                    trade.rebuy_manual_stock(stock, earning_rate, num)
-                else:
-                    logger.debug("물타기 제외 종목입니다 : {}".format(stock))
-
-        ## ---------------------------------- auto ------------------------------------------ ##
-
-        if argument[1] == '1':
-            trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-            logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
-            logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
-            for i in range(len(trade.user_stock_list)):
-                # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
-                stock = trade.user_stock_list[i]
-                buy_amount = int(stock['buy_amount'])
-                if buy_amount > trade.max_amount:
-                    logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
-                                                                                       trade.max_amount))
-                    continue
-                if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                    trade.rebuy_user_stock(stock)
-                    trade.rebuy_1_stock(stock)
-                else:
-                    logger.debug("물타기 제외 종목입니다 : {}".format(stock))
-
-            sleep(0.5)
+        if argument[1] in ['4', '5']: # 수동
+            logger.debug('주식정보 가져오기')
             trade.get_user_stock()
-            
-        if argument[1] == '3':
-            if trade.new_buy_stock == 1:
-                # 사용자 관심종목으로 부터 리스트 가져오기
-                trade.get_interesting_stock()
-                # 미체결 매수주문 정보 가져오기
-                trade.get_not_done_order()
-                # 미체결 매도주문 정보 가져오기
-                #trade.get_not_done_sell()
-                logger.debug('>>>>>>>>>>>> 신규 종목 매수 <<<<<<<<<<<<<<')
-                trade.set_buy_stock_num()
-                trade.buy_new_stock()
 
-                sleep(0.5)
+            with open("D:\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
+                wr = csv.writer(f)
+                wr.writerow(["{}".format(datetime.datetime.today().strftime("%Y/%m/%d")), "{}".format(trade.user_stock_num)])
+
+            ## ---------------------------------- manual ------------------------------------------ ##
+
+            if argument[1] == '4':
+                logger.debug('>>>>>>>>>>>> 수동 매도 <<<<<<<<<<<<<<')
+                earning_rate = argument[3].strip('%')
+                num = argument[4].strip('ea')
+                for stock in trade.user_stock_list:
+                    remain = int(stock['available_num'])
+                    trade.sell_manual_stock(stock, earning_rate, remain, num)
+
+            if argument[1] == '5':
+                logger.debug('>>>>>>>>>>>>수동 매수 <<<<<<<<<<<<<<')
+                trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
+                logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
+                earning_rate = argument[3].strip('%')
+                num = argument[4].strip('ea')
+                for i in range(len(trade.user_stock_list)):
+                    # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
+                    stock = trade.user_stock_list[i]
+                    buy_amount = int(stock['buy_amount'])
+                    if buy_amount > trade.max_amount:
+                        logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
+                                                                                           trade.max_amount))
+                        continue
+                    if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
+                        trade.rebuy_manual_stock(stock, earning_rate, num)
+                    else:
+                        logger.debug("물타기 제외 종목입니다 : {}".format(stock))
+
+        elif argument[1] in ['0', '1', '2', '3', '12']:  # 자동
+            ## ---------------------------------- auto ------------------------------------------ ##
+
+            if argument[1] == '1':
+                logger.debug('주식정보 가져오기')
                 trade.get_user_stock()
 
-        if argument[1] == '0' or argument[1] == '2':
-            logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
-            for stock in trade.user_stock_list:
-                remain = int(stock['available_num'])
-                # 주단위 매도
-                if remain:
-                    remain = trade.sell_1_stock(stock, 1, remain)   # 1%에 주식 1개
-                if remain:
-                    remain = trade.sell_2_stock(stock, 2, remain)   # 2%에 주식 2개
-                for i in range(len(trade.sell_earning_rate)):
-                    if trade.sell_earning_rate[i] == 0:
-                        break
-                    if remain == 0:
-                        break
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain, trade.sell_stock_amount[i])
-                logger.debug("남은 주식 수 : {}".format(remain))
+                trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
+                logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
+                logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
+                for i in range(len(trade.user_stock_list)):
+                    # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
+                    stock = trade.user_stock_list[i]
+                    buy_amount = int(stock['buy_amount'])
+                    if buy_amount > trade.max_amount:
+                        logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
+                                                                                           trade.max_amount))
+                        continue
+                    if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
+                        trade.rebuy_user_stock(stock)
+                        trade.rebuy_1_stock(stock)
+                    else:
+                        logger.debug("물타기 제외 종목입니다 : {}".format(stock))
+
+                sleep(0.5)
+
+            if argument[1] == '3':
+                logger.debug('주식정보 가져오기')
+                trade.get_user_stock()
+
+                if trade.new_buy_stock == 1:
+                    # 사용자 관심종목으로 부터 리스트 가져오기
+                    trade.get_interesting_stock()
+                    # 미체결 매수주문 정보 가져오기
+                    trade.get_not_done_order()
+                    # 미체결 매도주문 정보 가져오기
+                    #trade.get_not_done_sell()
+                    logger.debug('>>>>>>>>>>>> 신규 종목 매수 <<<<<<<<<<<<<<')
+                    trade.set_buy_stock_num()
+                    trade.buy_new_stock()
+
+                    sleep(0.5)
+
+            if argument[1] == '0' or argument[1] == '2':
+                logger.debug('주식정보 가져오기')
+                trade.get_user_stock()
+
+                logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
+                for stock in trade.user_stock_list:
+                    remain = int(stock['available_num'])
+                    # 주단위 매도
+                    if remain:
+                        remain = trade.sell_1_stock(stock, 1, remain)  # 1%에 주식 1개
+                    if remain:
+                        remain = trade.sell_2_stock(stock, 2, remain)  # 2%에 주식 2개
+                    for i in range(len(trade.sell_earning_rate)):
+                        if trade.sell_earning_rate[i] == 0:
+                            break
+                        if remain == 0:
+                            break
+                        remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain,
+                                                       trade.sell_stock_amount[i])
+                    logger.debug("남은 주식 수 : {}".format(remain))
+
+            if argument[1] == '0' or argument[1] == '12':
+                logger.debug('신용주식정보 가져오기')
+                trade.get_user_credit_stock()
+
+                logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
+                for stock in trade.user_stock_list:
+                    remain = int(stock['possession_num'])
+                    for i in range(len(trade.sell_credit_earning_rate)):
+                        if trade.sell_credit_earning_rate[i] == 0:
+                            break
+                        if remain == 0:
+                            break
+                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_earning_rate[i], remain,
+                                                       int(stock['possession_num'])) # 전량 매도
+                    logger.debug("남은 주식 수 : {}".format(remain))
 
     except Exception as err:
         logger.exception(err)
 
+    logger.debug("완료!")
+
     if argument[1] in ['0', '1', '2', '3']:
-        logger.debug("######## 완료 ########")
         os.system("taskkill /im KaKaoTalk.exe")
-        os.system("C:\\Users\\deser\\PycharmProjects\\secretary\\카카오톡.lnk")
+        os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
 
     '''
 

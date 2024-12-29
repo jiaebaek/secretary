@@ -92,6 +92,7 @@ class Kiwoom(QAxWidget):
     def comm_rq_data(self, rqname, trcode, next, screen_no):
         self.remained_data = False
         ret = self.dynamicCall("CommRqData(QString, QString, int, QString", rqname, trcode, next, screen_no)
+        logging.debug(ret)
         self.tr_event_loop = QEventLoop()
         self.tr_event_loop.exec_()
 
@@ -121,6 +122,8 @@ class Kiwoom(QAxWidget):
             self._opt10075(rqname, trcode)
         elif rqname == "계좌평가현황요청":
             self._opw00004(rqname, trcode)
+        elif rqname == "계좌수익률요청":
+            self._opt10085(rqname, trcode)
         elif rqname == "수동주문":
             self.order_loop.exit()
             return
@@ -133,8 +136,70 @@ class Kiwoom(QAxWidget):
             pass
 
     def _opw00004(self, rqname, trcode):
-        self.ret_data = {}
-        self.ret_data['remain'] = self._comm_get_data(trcode, "", rqname, 0, "D+2추정예수금")
+        self.ret_cnt = self._get_repeat_cnt(trcode, rqname)
+
+        self.ret_multi_data = []
+        real_server = False if self.get_server_gubun() else True
+        try:
+            for i in range(self.ret_cnt):
+                is_credit = self._comm_get_data(trcode, "", rqname, i, "대출일")
+                if is_credit == "":
+                    continue
+                loan_date = datetime.datetime.strptime(is_credit, "%Y%m%d")
+                today = datetime.datetime.today()
+
+                # 같은 달인지 확인
+                if loan_date.year == today.year and loan_date.month == today.month:
+                    loan_days = (today - loan_date).days + 5 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 주말이나 공휴일이 낀 경우 최대 7일까지 이자가 추가로 붙을수 있음
+                else:
+                    loan_days = today.day  # 다른 달일 경우 오늘 날짜의 일(day)만 사용
+
+                buy_amount = float(self._comm_get_data(trcode, "", rqname, i, "매입금액"))
+
+                interest = (buy_amount * 0.07 * loan_days) / 365 # 이자율은 7프로로 가정
+                profit_loss_price = float(self._comm_get_data(trcode, "", rqname, i, "손익금액"))
+                profit_loss_price -= interest
+                earning_rate = ((buy_amount + profit_loss_price) / buy_amount * 100) - 100
+
+                data = {
+                    'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목코드").lstrip('A')),
+                    'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
+                    'current_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "현재가")),
+                    'buy_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "평균단가")),
+                    'buy_amount': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입금액")),
+                    'possession_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "보유수량")),
+                    'profit_loss_price': '{}'.format(profit_loss_price),
+                    'loan_days': '{}'.format(loan_days),
+                    'earning_rate': '{}'.format(round(earning_rate, 2)),
+                    'interest': '{}'.format(interest)
+
+                }
+                self.ret_multi_data.append(data)
+
+        except Exception as err:
+            logger.exception(err)
+
+
+    def _opt10085(self, rqname, trcode):
+        self.ret_cnt = self._get_repeat_cnt(trcode, rqname)
+
+        self.ret_multi_data = []
+        real_server = False if self.get_server_gubun() else True
+        for i in range(self.ret_cnt):
+            is_credit = self._comm_get_data(trcode, "", rqname, i, "대출일")
+            if is_credit == "":
+                continue
+
+            data = {
+                'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목코드").lstrip('A')),
+                'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
+                'current_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "현재가")),
+                'buy_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입가")),
+                'buy_amount': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입금액")),
+                'possession_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "보유수량")),
+                'credit_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "신용이자"))
+            }
+            self.ret_multi_data.append(data)
 
     def _opt10075(self, rqname, trcode):
         self.ret_cnt = self._get_repeat_cnt(trcode, rqname)
@@ -165,6 +230,9 @@ class Kiwoom(QAxWidget):
         real_server = False if self.get_server_gubun() else True
 
         for i in range(self.ret_cnt):
+            is_credit = self._comm_get_data(trcode, "", rqname, i, "신용구분")
+            if is_credit == "03":
+                continue
             total_earning_rate = self._comm_get_data(trcode, "", rqname, i, "수익률(%)")
             if real_server:
                 total_earning_rate = float(total_earning_rate) / 100
