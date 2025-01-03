@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import datetime
 
-LOG_FILE = 'D:\\secretary_log\\'
+LOG_FILE = 'C:\\inetpub\\wwwroot\\log\\'
 logger = logging.getLogger("trader")
 logger.setLevel(logging.DEBUG)
 
@@ -150,13 +150,13 @@ class Kiwoom(QAxWidget):
 
                 # 같은 달인지 확인
                 if loan_date.year == today.year and loan_date.month == today.month:
-                    loan_days = (today - loan_date).days + 5 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 주말이나 공휴일이 낀 경우 최대 7일까지 이자가 추가로 붙을수 있음
+                    loan_days = (today - loan_date).days + 2 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
                 else:
                     loan_days = today.day  # 다른 달일 경우 오늘 날짜의 일(day)만 사용
 
                 buy_amount = float(self._comm_get_data(trcode, "", rqname, i, "매입금액"))
 
-                interest = (buy_amount * 0.07 * loan_days) / 365 # 이자율은 7프로로 가정
+                interest = (buy_amount * 0.08 * loan_days) / 365 # 이자율은 7프로로 가정
                 profit_loss_price = float(self._comm_get_data(trcode, "", rqname, i, "손익금액"))
                 profit_loss_price -= interest
                 earning_rate = ((buy_amount + profit_loss_price) / buy_amount * 100) - 100
@@ -171,8 +171,8 @@ class Kiwoom(QAxWidget):
                     'profit_loss_price': '{}'.format(profit_loss_price),
                     'loan_days': '{}'.format(loan_days),
                     'earning_rate': '{}'.format(round(earning_rate, 2)),
-                    'interest': '{}'.format(interest)
-
+                    'interest': '{}'.format(interest),
+                    'loan_date': '{}'.format(is_credit)
                 }
                 self.ret_multi_data.append(data)
 
@@ -479,6 +479,58 @@ class Kiwoom(QAxWidget):
             #raise Exception(f"sendOrder({code}, {qty}, {price}): Return Code is None")
         elif return_code != ReturnCode.OP_ERR_NONE:
             logger.debug((f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}"))
+            #raise Exception(f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}")
+
+
+        # receiveTrData() 에서 루프종료
+        self.order_loop = QEventLoop()
+        self.order_loop.exec_()
+
+    def send_credit_order(self, requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo):
+        """
+    819         주식 주문 메서드
+    820
+    821         sendOrder() 메소드 실행시,
+    822         OnReceiveMsg, OnReceiveTrData, OnReceiveChejanData 이벤트가 발생한다.
+    823         이 중, 주문에 대한 결과 데이터를 얻기 위해서는 OnReceiveChejanData 이벤트를 통해서 처리한다.
+    824         OnReceiveTrData 이벤트를 통해서는 주문번호를 얻을 수 있는데, 주문후 이 이벤트에서 주문번호가 ''공백으로 전달되면,
+    825         주문접수 실패를 의미한다.
+    826
+    827         :param requestName: string - 주문 요청명(사용자 정의)
+    828         :param screenNo: string - 화면번호(4자리)
+    829         :param accountNo: string - 계좌번호(10자리)
+    830         :param orderType: int - 주문유형(1: 신규매수, 2: 신규매도, 3: 매수취소, 4: 매도취소, 5: 매수정정, 6: 매도정정)
+    831         :param code: string - 종목코드
+    832         :param qty: int - 주문수량
+    833         :param price: int - 주문단가
+    834         :param hogaType: string - 거래구분(00: 지정가, 03: 시장가, 05: 조건부지정가, 06: 최유리지정가, 그외에는 api 문서참조)
+    834         :param creditType: string - 신용구분(03: 시장가, 33: 신용매도 융자 상환, 99: 신용매도 융자 합)
+    834         :param loanDate: string - 거래구분(00: 지정가, ㅛㅇ03: 시장가, 05: 조건부지정가, 06: 최유리지정가, 그외에는 api 문서참조)
+    835         :param originOrderNo: string - 원주문번호(신규주문에는 공백, 정정및 취소주문시 원주문번호르 입력합니다.)
+    836         """
+
+        if not self.get_connect_state():
+            raise Exception()
+
+        if not (isinstance(requestName, str)
+                    and isinstance(screenNo, str)
+                    and isinstance(accountNo, str)
+                    and isinstance(orderType, int)
+                    and isinstance(code, str)
+                    and isinstance(qty, int)
+                    and isinstance(price, int)
+                    and isinstance(hogaType, str)
+                    and isinstance(originOrderNo, str)):
+            raise Exception()
+        logger.debug("{} {} {} {} {} {} {} {} {}".format(requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo))
+        return_code = self.dynamicCall("SendOrderCredit(QString, QString, QString, int, QString, int, int, QString, QString, QString, QString)",
+                                      [requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo])
+
+        if return_code == None:
+            logger.debug((f"SendOrderCredit({code}, {qty}, {price}): Return Code is None"))
+            #raise Exception(f"sendOrder({code}, {qty}, {price}): Return Code is None")
+        elif return_code != ReturnCode.OP_ERR_NONE:
+            logger.debug((f"SendOrderCredit({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}"))
             #raise Exception(f"sendOrder({code}, {qty}, {price}): {ReturnCode.CAUSE[return_code]}")
 
 
