@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import datetime
 
-LOG_FILE = 'C:\\inetpub\\wwwroot\\log\\'
+LOG_FILE = 'D:\\secretary_log\\'
 logger = logging.getLogger("trader")
 logger.setLevel(logging.DEBUG)
 
