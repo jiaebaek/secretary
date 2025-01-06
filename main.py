@@ -595,12 +595,12 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        if after_market:
+        if after_market: # 시간외 단일가
             self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
-                                        num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-        else: # 시간외 단일가
+                                        num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+        else:
             self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
-                                          num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+                                          num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
 
         sleep(0.5)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
