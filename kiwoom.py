@@ -150,13 +150,13 @@ class Kiwoom(QAxWidget):
 
                 # 같은 달인지 확인
                 if loan_date.year == today.year and loan_date.month == today.month:
-                    loan_days = (today - loan_date).days + 2 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
+                    loan_days = (today - loan_date).days + 2 - 1 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
                 else:
                     loan_days = today.day  # 다른 달일 경우 오늘 날짜의 일(day)만 사용
 
                 buy_amount = float(self._comm_get_data(trcode, "", rqname, i, "매입금액"))
 
-                interest = (buy_amount * 0.08 * loan_days) / 365 # 이자율은 7프로로 가정
+                interest = round((buy_amount * 0.06 * loan_days) / 365, 2) # 이자율은 7프로로 가정
                 profit_loss_price = float(self._comm_get_data(trcode, "", rqname, i, "손익금액"))
                 profit_loss_price -= interest
                 earning_rate = ((buy_amount + profit_loss_price) / buy_amount * 100) - 100
