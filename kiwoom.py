@@ -150,7 +150,7 @@ class Kiwoom(QAxWidget):
 
                 # 같은 달인지 확인
                 if loan_date.year == today.year and loan_date.month == today.month:
-                    loan_days = (today - loan_date).days + 2 - 1 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
+                    loan_days = (today - loan_date).days + 2 # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
                 else:
                     loan_days = today.day  # 다른 달일 경우 오늘 날짜의 일(day)만 사용
 
