@@ -70,7 +70,8 @@ class Trading:
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.sell_credit_earning_rate = [0]
+        self.sell_credit_hoga = [0]
+        self.sell_credit_hoga_after_market = [0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
         self.default_buy_new_stock_num = 100
@@ -179,7 +180,15 @@ class Trading:
             if not row[1]:
                 continue
             if row[0] == SELL_HOGA_1:
-                self.sell_credit_earning_rate[0] = row[1]
+                self.sell_credit_hoga[0] = row[1]
+
+        cur.execute("select * from 신용시간외매도설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == SELL_HOGA_1:
+                self.sell_credit_hoga_after_market[0] = row[1]
 
         cur.execute("select * from secretary_stockdownrate")
         rows = cur.fetchall()
@@ -756,7 +765,7 @@ argument = sys.argv
 
 
 menu = {
-    '0': "자동-전체 (일반 주식 매도)",
+    '0': "자동-전체 (신용일반 주식 매도)",
     '1': "자동-물타기-매수",
     '2': "자동-매도",
     '3': "자동-신규-매수",
@@ -937,7 +946,7 @@ if __name__ == "__main__":
                         remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain,
                                                        trade.sell_stock_amount[i])
                     logger.debug("남은 주식 수 : {}".format(remain))
-            '''
+
             if argument[1] == '0' or argument[1] == '12':
                 logger.debug('신용주식정보 가져오기')
                 trade.get_user_credit_stock()
@@ -945,31 +954,31 @@ if __name__ == "__main__":
                 logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
                 for stock in trade.user_stock_list:
                     remain = int(stock['possession_num'])
-                    for i in range(len(trade.sell_credit_earning_rate)):
-                        if trade.sell_credit_earning_rate[i] == 0:
+                    for i in range(len(trade.sell_credit_hoga)):
+                        if trade.sell_credit_hoga[i] == 0:
                             break
                         if remain == 0:
                             break
-                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_earning_rate[i], remain,
+                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga[i], remain,
                                                        int(stock['possession_num'])) # 전량 매도
                     logger.debug("남은 주식 수 : {}".format(remain))
-            '''
 
             if argument[1] == '16': # 시간외 거래
-                '''logger.debug('신용주식정보 가져오기')
+                logger.debug('신용주식정보 가져오기')
                 trade.get_user_credit_stock()
 
                 logger.debug('>>>>>>>>>>>> 일괄 신용 시간외 매도 <<<<<<<<<<<<<<')
                 for stock in trade.user_stock_list:
                     remain = int(stock['possession_num'])
-                    for i in range(len(trade.sell_credit_earning_rate)):
-                        if trade.sell_credit_earning_rate[i] == 0:
+                    for i in range(len(trade.sell_credit_hoga_after_market)):
+                        if trade.sell_credit_hoga_after_market[i] == 0:
                             break
                         if remain == 0:
                             break
-                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_earning_rate[i], remain,
+                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga_after_market[i], remain,
                                                        int(stock['possession_num']), after_market=True) # 전량 매도
-                    logger.debug("남은 주식 수 : {}".format(remain))'''
+                    logger.debug("남은 주식 수 : {}".format(remain))
+
                 logger.debug('일반주식정보 가져오기')
                 trade.get_user_stock()
                 logger.debug('>>>>>>>>>>>> 일괄 시간외 매도 <<<<<<<<<<<<<<')
