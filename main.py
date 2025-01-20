@@ -12,6 +12,7 @@ import datetime
 
 ORDER_INTERVAL = "주문간격(초)"  # 주문 간격
 BUY_NEW_STOCK_AMOUNT = "신규매수주식금액"  # 신규매수 주식 금액
+BUY_NEW_STOCK_NUM = "신규매수주식개수"  # 신규매수 주식 금액
 REBUY_STOCK_AMOUNT = "물타기매수주식금액"  # 물타기매수 주식 금액
 SELL_STOCK_AMOUNT_1 = "1차 매도주식금액"  # 매도 주식 금액
 SELL_STOCK_AMOUNT_2 = "2차 매도주식금액"  # 매도 주식 금액
@@ -65,6 +66,8 @@ class Trading:
         self.buy_code_list = []
         self.buy_new_stock_num = 100
         self.order_interval = 150
+        self.buy_new_credit_stock_amount = 300000
+        self.buy_new_credit_stock_num = 10
         self.buy_new_stock_amount = 300000
         self.rebuy_stock_amount = 300000
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -174,6 +177,16 @@ class Trading:
             elif row[0] == SELL_STOCK_AMOUNT_10:
                 self.sell_stock_amount[9] = row[1]
 
+        cur.execute("select * from 신용매수설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == BUY_NEW_STOCK_NUM:
+                self.buy_new_credit_stock_num = row[1]
+            elif row[0] == BUY_NEW_STOCK_AMOUNT:
+                self.buy_new_credit_stock_amount = row[1]
+                
         cur.execute("select * from 신용매도설정")
         rows = cur.fetchall()
         for row in rows:
@@ -238,8 +251,8 @@ class Trading:
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("조회구분", 2)
         self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
-        self.user_stock_num = self.kiwoom.ret_cnt
-        self.user_stock_list = self.kiwoom.ret_multi_data
+        self.user_credit_stock_num = self.kiwoom.ret_cnt
+        self.user_credit_stock_list = self.kiwoom.ret_multi_data
 
         while self.kiwoom.remained_data:
             logger.debug("다음 잔고조회")
@@ -247,11 +260,11 @@ class Trading:
             self.kiwoom.set_input_value("계좌번호", self.account)
             self.kiwoom.set_input_value("조회구분", 2)
             self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 2, "0101")
-            self.user_stock_num += self.kiwoom.ret_cnt
-            self.user_stock_list.extend(self.kiwoom.ret_multi_data)
+            self.user_credit_stock_num += self.kiwoom.ret_cnt
+            self.user_credit_stock_list.extend(self.kiwoom.ret_multi_data)
 
-        logger.debug('user stock cnt : {}'.format(self.user_stock_num))
-        logger.debug(self.user_stock_list)
+        logger.debug('user stock cnt : {}'.format(self.user_credit_stock_num))
+        logger.debug(self.user_credit_stock_list)
 
     def get_user_remain(self):
         # 예수금 조회
@@ -284,8 +297,14 @@ class Trading:
         return int(self.kiwoom.ret_data['current_price']), self.kiwoom.ret_data['name']
 
     def is_stock_in_user_stock(self, code):
-        for i in range(self.user_stock_num):
+        for i, _ in enumerate(self.user_stock_list):
             if code == self.user_stock_list[i]['code']:
+                return True
+        return False
+
+    def is_stock_in_user_credit_stock(self, code):
+        for i, _ in enumerate(self.user_credit_stock_list):
+            if code == self.user_credit_stock_list[i]['code']:
                 return True
         return False
 
@@ -373,6 +392,35 @@ class Trading:
         else:
             logger.debug('보유주식이 {}개이므로 더이상 신규매수할수 없습니다.'.format(self.user_stock_num))
 
+    def buy_new_credit_stock(self):
+        # 신규종목 매수#
+        if not self.interesting_stocks:
+            logger.debug("관심종목이 없습니다.")
+            return
+        random.seed(self.user_stock_num)
+        buy_cnt = 0
+        bought_key = []
+        # 관심종목을 랜덤으로 정렬
+        random.shuffle(self.interesting_stocks)
+        for key in range(len(self.interesting_stocks)):
+            if key >= self.buy_new_credit_stock_num:
+                break
+            # 해당 종목이 이미 보유중인지 확인
+            if self.is_stock_in_user_credit_stock(self.interesting_stocks[key]) \
+                or self.is_stock_in_user_stock(self.interesting_stocks[key]) \
+                or key in bought_key:
+                logger.debug('이미 보유하고 있거나 신규매수한 종목입니다. skip!! [{}]'.format(self.interesting_stocks[key]))
+                continue
+            bought_key.append(key)
+            logger.debug(" - 현재가 정보 요청")
+            price, name = self.get_current_price(self.interesting_stocks[key])
+            logger.debug("현재가 정보 요청 완료")
+            # -1프로로 매수 예약
+            if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -1, price):
+                buy_cnt += 1
+            logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
+            sleep(0.5)
+
     def _buy_current_price(self, stock_code, amount, buy_amount=None):
         # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
@@ -441,6 +489,35 @@ class Trading:
             return False
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
+        sleep(0.5)
+        logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
+        return True
+
+    def _buy_credit_designated_price(self, stock_code, amount, earning_rate, base_price, buy_amount=None):
+        # 수익률(earning_rate) 지정가로 예약 매수
+        if 'J' in stock_code:
+            return
+
+        price = int(base_price) * (1 + ((earning_rate) / 100))
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit)
+        price = int(price * unit)
+        if amount == 0:
+            num = 1
+        else:
+            num = int(amount / price)
+        if buy_amount:
+            if buy_amount + (num * price) > self.max_amount:
+                num = int((self.max_amount - buy_amount) / price)
+        if num == 0:
+            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
+            return False
+        self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
+                               num, price, HOGATYPE['지정가'], "03", "", "")
+
         sleep(0.5)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         return True
@@ -772,15 +849,16 @@ menu = {
     '4': "수동-매도",
     '5': "수동-물타기-매수",
     '12': "자동-신용-주식-매도",
+    '13': "자동-신용-주식-매수",
     '16': "자동-신용일반-주식-시간외-매도"
 }
 
 formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
 if argument[2] =='test':
-    fileHandler = logging.FileHandler(LOG_FILE+'{}_test.txt'.format(menu[argument[1]]))
+    fileHandler = logging.FileHandler(LOG_FILE+'{}_{}_test.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu[argument[1]]))
 else:
     fileHandler = logging.FileHandler(
-        LOG_FILE + '{}.txt'.format(menu[argument[1]]))
+        LOG_FILE + '{}_{}.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu[argument[1]]))
 streamHandler = logging.StreamHandler()
 
 file_max_bytes = 10 * 1024 * 1024
@@ -926,6 +1004,18 @@ if __name__ == "__main__":
 
                     sleep(0.5)
 
+            if argument[1] == '13':
+                logger.debug('신용 주식정보 가져오기')
+                trade.get_user_credit_stock()
+                logger.debug('일반 주식정보 가져오기')
+                trade.get_user_stock()
+
+                # 사용자 관심종목으로 부터 리스트 가져오기
+                trade.get_interesting_stock()
+                logger.debug('>>>>>>>>>>>> 신규 신용 종목 매수 <<<<<<<<<<<<<<')
+                trade.buy_new_credit_stock()
+                sleep(0.5)
+
             if argument[1] == '0' or argument[1] == '2':
                 logger.debug('주식정보 가져오기')
                 trade.get_user_stock()
@@ -947,7 +1037,7 @@ if __name__ == "__main__":
                 trade.get_user_credit_stock()
 
                 logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_stock_list:
+                for stock in trade.user_credit_stock_list:
                     remain = int(stock['possession_num'])
                     for i in range(len(trade.sell_credit_hoga)):
                         if trade.sell_credit_hoga[i] == 0:
@@ -963,7 +1053,7 @@ if __name__ == "__main__":
                 trade.get_user_credit_stock()
 
                 logger.debug('>>>>>>>>>>>> 일괄 신용 시간외 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_stock_list:
+                for stock in trade.user_credit_stock_list:
                     remain = int(stock['possession_num'])
                     for i in range(len(trade.sell_credit_hoga_after_market)):
                         if trade.sell_credit_hoga_after_market[i] == 0:
@@ -971,7 +1061,7 @@ if __name__ == "__main__":
                         if remain == 0:
                             break
                         remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga_after_market[i], remain,
-                                                       int(stock['possession_num']), after_market=True) # 전량 매도
+                                                       int(stock['possession_num']), after_market=True)  # 전량 매도
                     logger.debug("남은 주식 수 : {}".format(remain))
 
                 logger.debug('일반주식정보 가져오기')
