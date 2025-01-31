@@ -5,6 +5,7 @@ import logging.handlers
 import datetime
 from logger import logger
 
+
 class Kiwoom(QAxWidget):
 
     def __init__(self):
@@ -137,12 +138,17 @@ class Kiwoom(QAxWidget):
                     loan_days = (today - loan_date).days + 2  # 신용이자가 영업일 기준으로 +2일 부터 대출이 시행되기 때문에 2일 추가
                     if loan_days < 0:
                         loan_days += 2
+                elif loan_date.month > today.month:  # 30, 31일에 매수할 경우, 대출 시행 일이 월이 바뀌면서 미래가 됨
+                    loan_days = 1
                 else:
                     loan_days = today.day  # 다른 달일 경우 오늘 날짜의 일(day)만 사용
 
+                if loan_days < 0:  # 명절이 낀 경우에는 loan_days가 마이너스가 될 수 있어서 이 경우에는 0으로 처리함
+                    loan_days = 1
+
                 buy_amount = float(self._comm_get_data(trcode, "", rqname, i, "매입금액"))
 
-                interest = round((buy_amount * 0.06 * loan_days) / 365, 2)  # 이자율은 7프로로 가정
+                interest = round((buy_amount * 0.07 * loan_days) / 365, 2) # 이자율은 7프로로 가정
                 profit_loss_price = float(self._comm_get_data(trcode, "", rqname, i, "손익금액"))
                 profit_loss_price -= interest
                 earning_rate = ((buy_amount + profit_loss_price) / buy_amount * 100) - 100
