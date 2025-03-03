@@ -221,26 +221,30 @@ class Kiwoom(QAxWidget):
 
         real_server = False if self.get_server_gubun() else True
 
-        for i in range(self.ret_cnt):
-            is_credit = self._comm_get_data(trcode, "", rqname, i, "신용구분")
-            if is_credit == "03":
-                continue
-            total_earning_rate = self._comm_get_data(trcode, "", rqname, i, "수익률(%)")
-            if real_server:
-                total_earning_rate = float(total_earning_rate) / 100
-                total_earning_rate = str(total_earning_rate)
+        try:
+            for i in range(self.ret_cnt):
+                is_credit = self._comm_get_data(trcode, "", rqname, i, "신용구분")
+                if is_credit == "03":
+                    continue
+                total_earning_rate = self._comm_get_data(trcode, "", rqname, i, "수익률(%)")
 
-            data = {
-                'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목번호").lstrip('A')),
-                'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
-                'current_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "현재가")),
-                'buy_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입가")),
-                'buy_amount': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입금액")),
-                'possession_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "보유수량")),
-                'available_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매매가능수량")),
-                'earning_rate': '{}'.format(total_earning_rate)
-            }
-            self.ret_multi_data.append(data)
+                if real_server:
+                    total_earning_rate = float(total_earning_rate) / 100
+                    total_earning_rate = str(total_earning_rate)
+
+                data = {
+                    'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목번호").lstrip('A')),
+                    'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
+                    'current_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "현재가")),
+                    'buy_price': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입가")),
+                    'buy_amount': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매입금액")),
+                    'possession_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "보유수량")),
+                    'available_num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "매매가능수량")),
+                    'earning_rate': '{}'.format(total_earning_rate)
+                }
+                self.ret_multi_data.append(data)
+        except Exception as err:
+            logger.exception(err)
 
     def get_condition_load(self):
         if not self.get_connect_state():

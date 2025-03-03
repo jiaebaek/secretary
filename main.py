@@ -50,7 +50,7 @@ TR_REQ_TIME_INTERVAL = 0.3
 ORDERTYPE = {'신규매수': 1, '신규매도': 2, '매수취소': 3, '매도취소': 4}
 HOGATYPE = {'지정가': "00", '시장가': "03", '시간외단일가': "62"}
 
-HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 0: 1000}
+HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 2000000: 1000}
 
 class Trading:
     def __init__(self):
@@ -227,6 +227,8 @@ class Trading:
         logger.debug('계좌번호 : {}'.format(self.account))
 
         self.kiwoom.set_input_value("계좌번호", self.account)
+        self.kiwoom.set_input_value("조회구분", "2")
+        self.kiwoom.set_input_value("거래소구분", "KRX")
         self.kiwoom.comm_rq_data("잔고조회", "opw00018", 0, "0101")
         self.user_stock_num = self.kiwoom.ret_cnt
         self.user_stock_list = self.kiwoom.ret_multi_data
@@ -235,6 +237,8 @@ class Trading:
             logger.debug("다음 잔고조회")
             sleep(TR_REQ_TIME_INTERVAL)
             self.kiwoom.set_input_value("계좌번호", self.account)
+            self.kiwoom.set_input_value("조회구분", "2")
+            self.kiwoom.set_input_value("거래소구분", "KRX")
             self.kiwoom.comm_rq_data("잔고조회", "opw00018", 2, "0101")
             self.user_stock_num += self.kiwoom.ret_cnt
             self.user_stock_list.extend(self.kiwoom.ret_multi_data)
@@ -249,7 +253,9 @@ class Trading:
         logger.debug('계좌번호 : {}'.format(self.account))
 
         self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("조회구분", 2)
+        self.kiwoom.set_input_value("상장폐지조회구분", "1")
+        self.kiwoom.set_input_value("거래소구분", "KRX")
+        self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
         self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
         self.user_credit_stock_num = self.kiwoom.ret_cnt
         self.user_credit_stock_list = self.kiwoom.ret_multi_data
@@ -258,7 +264,9 @@ class Trading:
             logger.debug("다음 잔고조회")
             sleep(TR_REQ_TIME_INTERVAL)
             self.kiwoom.set_input_value("계좌번호", self.account)
-            self.kiwoom.set_input_value("조회구분", 2)
+            self.kiwoom.set_input_value("상장폐지조회구분", "1")
+            self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
+            self.kiwoom.set_input_value("거래소구분", "KRX")
             self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 2, "0101")
             self.user_credit_stock_num += self.kiwoom.ret_cnt
             self.user_credit_stock_list.extend(self.kiwoom.ret_multi_data)
@@ -269,7 +277,9 @@ class Trading:
     def get_user_remain(self):
         # 예수금 조회
         self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("상장폐지조회구분", "0")
+        self.kiwoom.set_input_value("상장폐지조회구분", "1")
+        self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
+        self.kiwoom.set_input_value("거래소구분", "KRX")
         self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
         logger.debug('예수금 조회 : {}'.format(self.kiwoom.ret_data))
         sleep(TR_REQ_TIME_INTERVAL)
@@ -416,7 +426,7 @@ class Trading:
             price, name = self.get_current_price(self.interesting_stocks[key])
             logger.debug("현재가 정보 요청 완료")
             # -1프로로 매수 예약
-            if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -1, price):
+            if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -0.1, price):
                 buy_cnt += 1
             logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
             sleep(0.5)
