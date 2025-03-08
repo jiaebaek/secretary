@@ -47,7 +47,9 @@ BUY_NEW_STOCK = "신규종목매수"
 
 TR_REQ_TIME_INTERVAL = 0.3
 
-ORDERTYPE = {'신규매수': 1, '신규매도': 2, '매수취소': 3, '매도취소': 4}
+ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, '매수취소': 3, '매도취소': 4,
+             'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
+             'NXT매수': 21, 'NXT매도': 22, 'SOR취소': 23, 'SOR정정': 25}
 HOGATYPE = {'지정가': "00", '시장가': "03", '시간외단일가': "62"}
 
 HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 2000000: 1000}
@@ -83,9 +85,11 @@ class Trading:
         self.running_state = 1
         self.except_rebuy_list = []
         self.new_buy_stock = True
+        self.exchange = "KRX"
+        self.nxt_list = []
 
     def set_status_running(self):
-        conn = sqlite3.connect("../secretary_web/db.sqlite3")
+        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
         cur = conn.cursor()
 
         sql = '''update secretary_setup set value=1 where key="운영상태"'''
@@ -93,7 +97,7 @@ class Trading:
         conn.close()
 
     def get_status_running(self):
-        conn = sqlite3.connect("../secretary_web/db.sqlite3")
+        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
         cur = conn.cursor()
 
         cur.execute("select value from secretary_setup where key=\"운영상태\"")
@@ -102,7 +106,7 @@ class Trading:
         conn.close()
 
     def update_options(self):
-        conn = sqlite3.connect("../secretary_web/db.sqlite3")
+        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
         cur = conn.cursor()
 
         cur.execute("select * from secretary_setup")
@@ -220,15 +224,20 @@ class Trading:
 
         conn.close()
 
-    def get_user_stock(self):
+    def get_user_stock(self, after_market=False):
         # 사용자 계정의 보유 주식 개수 확인
+        if after_market:
+            exchange = "KRX"
+        else:
+            exchange = self.exchange
+
         self.account = self.kiwoom.get_login_info()
         self.account = self.account.split(';')[0]
         logger.debug('계좌번호 : {}'.format(self.account))
 
         self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("조회구분", "2")
-        self.kiwoom.set_input_value("거래소구분", "KRX")
+        self.kiwoom.set_input_value("조회구분", "1")
+        self.kiwoom.set_input_value("거래소구분", exchange)
         self.kiwoom.comm_rq_data("잔고조회", "opw00018", 0, "0101")
         self.user_stock_num = self.kiwoom.ret_cnt
         self.user_stock_list = self.kiwoom.ret_multi_data
@@ -237,8 +246,8 @@ class Trading:
             logger.debug("다음 잔고조회")
             sleep(TR_REQ_TIME_INTERVAL)
             self.kiwoom.set_input_value("계좌번호", self.account)
-            self.kiwoom.set_input_value("조회구분", "2")
-            self.kiwoom.set_input_value("거래소구분", "KRX")
+            self.kiwoom.set_input_value("조회구분", "1")
+            self.kiwoom.set_input_value("거래소구분", exchange)
             self.kiwoom.comm_rq_data("잔고조회", "opw00018", 2, "0101")
             self.user_stock_num += self.kiwoom.ret_cnt
             self.user_stock_list.extend(self.kiwoom.ret_multi_data)
@@ -246,7 +255,12 @@ class Trading:
         logger.debug('user stock cnt : {}'.format(self.user_stock_num))
         logger.debug(self.user_stock_list)
 
-    def get_user_credit_stock(self):
+    def get_user_credit_stock(self, after_market=False):
+        if after_market:
+            exchange = "KRX"
+        else:
+            exchange = self.exchange
+
         # 사용자 계정의 보유 신용 주식 개수 확인
         self.account = self.kiwoom.get_login_info()
         self.account = self.account.split(';')[0]
@@ -254,7 +268,7 @@ class Trading:
 
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("상장폐지조회구분", "1")
-        self.kiwoom.set_input_value("거래소구분", "KRX")
+        self.kiwoom.set_input_value("거래소구분", exchange)
         self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
         self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
         self.user_credit_stock_num = self.kiwoom.ret_cnt
@@ -266,7 +280,7 @@ class Trading:
             self.kiwoom.set_input_value("계좌번호", self.account)
             self.kiwoom.set_input_value("상장폐지조회구분", "1")
             self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
-            self.kiwoom.set_input_value("거래소구분", "KRX")
+            self.kiwoom.set_input_value("거래소구분", exchange)
             self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 2, "0101")
             self.user_credit_stock_num += self.kiwoom.ret_cnt
             self.user_credit_stock_list.extend(self.kiwoom.ret_multi_data)
@@ -300,6 +314,8 @@ class Trading:
         logger.debug(len(self.interesting_stocks))
 
     def get_current_price(self, code):
+        if self.exchange == 'NXT':
+            code += '_NX'
         self.kiwoom.set_input_value("종목코드", code)
         self.kiwoom.comm_rq_data("주식기본정보", "opt10001", 0, "0101")
         logger.debug('현재가 조회 : {}'.format(self.kiwoom.ret_data))
@@ -331,9 +347,14 @@ class Trading:
         return False
 
     def get_not_done_order(self):  # 미체결 매수
+        if self.exchange == "NXT":
+            exchange = 2
+        else:
+            exchange = 1
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("체결구분", 1)
         self.kiwoom.set_input_value("매매구분", 2)
+        self.kiwoom.set_input_value("거래소구분", exchange)
         self.kiwoom.comm_rq_data("실시간체결", "opt10075", 0, "0101")
         self.not_done_orders_num = self.kiwoom.ret_cnt
         self.not_done_orders = self.kiwoom.ret_multi_data
@@ -341,9 +362,14 @@ class Trading:
         sleep(TR_REQ_TIME_INTERVAL)
 
     def get_not_done_sell(self):  # 미체결 매도
+        if self.exchange == "NXT":
+            exchange = 2
+        else:
+            exchange = 1
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("체결구분", 1)
         self.kiwoom.set_input_value("매매구분", 1)
+        self.kiwoom.set_input_value("거래소구분", exchange)
         self.kiwoom.comm_rq_data("실시간체결", "opt10075", 0, "0101")
         self.not_done_sell_num = self.kiwoom.ret_cnt
         self.not_done_sell = self.kiwoom.ret_multi_data
@@ -450,7 +476,7 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
 
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.7)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
@@ -469,7 +495,7 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
@@ -497,7 +523,7 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
@@ -525,7 +551,7 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
-        self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매수'], stock_code,
+        self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "03", "", "")
 
         sleep(0.5)
@@ -559,7 +585,7 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -585,10 +611,10 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
         sleep(0.7)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -608,7 +634,7 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -632,10 +658,10 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -659,10 +685,10 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -684,7 +710,7 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
         sleep(0.5)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
@@ -707,10 +733,10 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market: # 시간외 단일가
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                         num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
         else:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                           num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
 
         sleep(0.5)
@@ -739,10 +765,10 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market: # 시간외 단일가
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                         num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
         else:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                           num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
 
         sleep(0.5)
@@ -848,6 +874,22 @@ class Trading:
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
+    def set_exchange(self):
+        now = datetime.datetime.now()
+        now_tupule = now.timetuple()
+        logger.debug(now_tupule)
+        if now_tupule.tm_hour < 9:
+            self.exchange = "NXT"
+        elif now_tupule.tm_hour < 16:
+            self.exchange = "KRX"
+        else:
+            self.exchange = "NXT"
+        logger.debug(f"거래소 : {self.exchange}")
+
+        if self.exchange == "NXT":
+            self.nxt_list = self.kiwoom.get_code_list_by_market(self.exchange)
+            logger.debug(f"NXT 거래소 종목 리스트 : {self.nxt_list}")
+
 argument = sys.argv
 
 
@@ -860,7 +902,7 @@ menu = {
     '5': "수동-물타기-매수",
     '12': "자동-신용-주식-매도",
     '13': "자동-신용-주식-매수",
-    '16': "자동-신용일반-주식-시간외-매도"
+    '16': "자동-신용일반-주식-시간외NXT-매도"
 }
 
 formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
@@ -889,12 +931,12 @@ if __name__ == "__main__":
             now = datetime.datetime.now()
             now_tupule = now.timetuple()
             logger.debug(now_tupule)
-            while now_tupule.tm_hour < 9:
+            while now_tupule.tm_hour < 8:
                 sleep(60)
                 now = datetime.datetime.now()
                 now_tupule = now.timetuple()
                 logger.debug(now_tupule)
-            if now_tupule.tm_hour > 16:
+            if now_tupule.tm_hour > 17:
                 logger.debug("장이 마감되었습니다.")
                 exit(0)
         else:
@@ -934,6 +976,8 @@ if __name__ == "__main__":
         logger.debug('DB 접속')
         trade.update_options()
 
+        trade.set_exchange()
+
         if argument[1] in ['4', '5']: # 수동
             logger.debug('주식정보 가져오기')
             trade.get_user_stock()
@@ -952,7 +996,7 @@ if __name__ == "__main__":
                     remain = int(stock['available_num'])
                     trade.sell_manual_stock(stock, earning_rate, remain, num)
 
-            if argument[1] == '5':
+            elif argument[1] == '5':
                 logger.debug('>>>>>>>>>>>>수동 매수 <<<<<<<<<<<<<<')
                 trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
                 logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
@@ -1026,41 +1070,9 @@ if __name__ == "__main__":
                 trade.buy_new_credit_stock()
                 sleep(0.5)
 
-            if argument[1] == '0' or argument[1] == '2':
-                logger.debug('주식정보 가져오기')
-                trade.get_user_stock()
-
-                logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_stock_list:
-                    remain = int(stock['available_num'])
-                    for i in range(len(trade.sell_earning_rate)):
-                        if trade.sell_earning_rate[i] == 0:
-                            break
-                        if remain == 0:
-                            break
-                        remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain,
-                                                       trade.sell_stock_amount[i])
-                    logger.debug("남은 주식 수 : {}".format(remain))
-
-            if argument[1] == '0' or argument[1] == '12':
-                logger.debug('신용주식정보 가져오기')
-                trade.get_user_credit_stock()
-
-                logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_credit_stock_list:
-                    remain = int(stock['possession_num'])
-                    for i in range(len(trade.sell_credit_hoga)):
-                        if trade.sell_credit_hoga[i] == 0:
-                            break
-                        if remain == 0:
-                            break
-                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga[i], remain,
-                                                       int(stock['possession_num'])) # 전량 매도
-                    logger.debug("남은 주식 수 : {}".format(remain))
-
             if argument[1] == '16': # 시간외 거래
                 logger.debug('신용주식정보 가져오기')
-                trade.get_user_credit_stock()
+                trade.get_user_credit_stock(after_market=True)
 
                 logger.debug('>>>>>>>>>>>> 일괄 신용 시간외 매도 <<<<<<<<<<<<<<')
                 for stock in trade.user_credit_stock_list:
@@ -1075,7 +1087,7 @@ if __name__ == "__main__":
                     logger.debug("남은 주식 수 : {}".format(remain))
 
                 logger.debug('일반주식정보 가져오기')
-                trade.get_user_stock()
+                trade.get_user_stock(after_market=True)
                 logger.debug('>>>>>>>>>>>> 일괄 시간외 매도 <<<<<<<<<<<<<<')
                 for stock in trade.user_stock_list:
                     remain = int(stock['available_num'])
@@ -1084,6 +1096,43 @@ if __name__ == "__main__":
                                                    trade.sell_stock_amount[0], after_market=True)
                     remain = trade.sell_user_stock(stock, trade.sell_earning_rate[1], remain,
                                                    trade.sell_stock_amount[1], after_market=True)
+
+            if argument[1] == '0' or argument[1] == '2' or argument[1] == '16':
+                logger.debug('주식정보 가져오기')
+                trade.get_user_stock()
+
+                logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
+                for stock in trade.user_stock_list:
+                    if trade.exchange == 'NXT' and stock['code'] not in trade.nxt_list:
+                        continue
+                    remain = int(stock['available_num'])
+                    for i in range(len(trade.sell_earning_rate)):
+                        if trade.sell_earning_rate[i] == 0:
+                            break
+                        if remain == 0:
+                            break
+                        remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain,
+                                                       trade.sell_stock_amount[i])
+                    logger.debug("남은 주식 수 : {}".format(remain))
+
+            if argument[1] == '0' or argument[1] == '12' or argument[1] == '16':
+                logger.debug('신용주식정보 가져오기')
+                trade.get_user_credit_stock()
+
+                logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
+                for stock in trade.user_credit_stock_list:
+                    if trade.exchange == 'NXT' and stock['code'] not in trade.nxt_list:
+                        continue
+                    remain = int(stock['possession_num'])
+                    for i in range(len(trade.sell_credit_hoga)):
+                        if trade.sell_credit_hoga[i] == 0:
+                            break
+                        if remain == 0:
+                            break
+                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga[i], remain,
+                                                       int(stock['possession_num'])) # 전량 매도
+                    logger.debug("남은 주식 수 : {}".format(remain))
+
 
     except Exception as err:
         logger.exception(err)
