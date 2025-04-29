@@ -123,7 +123,10 @@ class Kiwoom(QAxWidget):
     def _opw00004(self, rqname, trcode):
         self.ret_cnt = self._get_repeat_cnt(trcode, rqname)
 
+        self.ret_data = {}
         self.ret_multi_data = []
+
+        self.ret_data["remain"] = self._comm_get_data(trcode, "", rqname, 0, "예수금")
         real_server = False if self.get_server_gubun() else True
         try:
             for i in range(self.ret_cnt):

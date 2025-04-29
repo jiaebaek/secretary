@@ -288,12 +288,16 @@ class Trading:
         logger.debug('user stock cnt : {}'.format(self.user_credit_stock_num))
         logger.debug(self.user_credit_stock_list)
 
-    def get_user_remain(self):
+    def get_user_remain(self, after_market=False):
+        if after_market:
+            exchange = "KRX"
+        else:
+            exchange = self.exchange
         # 예수금 조회
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("상장폐지조회구분", "1")
         self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
-        self.kiwoom.set_input_value("거래소구분", "KRX")
+        self.kiwoom.set_input_value("거래소구분", exchange)
         self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
         logger.debug('예수금 조회 : {}'.format(self.kiwoom.ret_data))
         sleep(TR_REQ_TIME_INTERVAL)
@@ -880,7 +884,7 @@ class Trading:
         logger.debug(now_tupule)
         if now_tupule.tm_hour < 9:
             self.exchange = "NXT"
-        elif now_tupule.tm_hour < 16:
+        elif now_tupule.tm_hour < 15:
             self.exchange = "KRX"
         else:
             self.exchange = "NXT"
