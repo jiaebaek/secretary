@@ -3,7 +3,9 @@ import sys
 from PyQt5.QtWidgets import *
 import os
 from logger import LOG_FILE, logger
-from trading_core import Trading
+import logging.handlers
+import datetime
+from trading_strategy import TradingStrategyFactory
 
 
 menu = {
