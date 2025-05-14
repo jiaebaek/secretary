@@ -7,6 +7,7 @@ import logging.handlers
 import datetime
 from trading_strategy import TradingStrategyFactory
 from config import KAKAOTALK_PATH
+from log_viewer import LogWindow
 
 
 menu = {
@@ -33,13 +34,8 @@ def setup_logging(menu_name, test=False):
     else:
         fileHandler = logging.FileHandler(log_filename)
     
-    streamHandler = logging.StreamHandler()
-    
     fileHandler.setFormatter(formatter)
-    streamHandler.setFormatter(formatter)
-    
     logger.addHandler(fileHandler)
-    logger.addHandler(streamHandler)
 
 def check_trading_time(trading_time, weekday, is_test=False):
     if is_test:
@@ -82,6 +78,15 @@ if __name__ == "__main__":
     menu_name = menu[menu_code]
     
     is_test = True if trading_time == 'test' else False
+    
+    # Initialize PyQt application
+    app = QApplication(sys.argv)
+    
+    # Create and show log window
+    log_window = LogWindow()
+    log_window.show()
+    log_window.update_status(f"Running: {menu_name}")
+    
     # Setup logging
     setup_logging(menu_name, is_test)
     
@@ -92,16 +97,14 @@ if __name__ == "__main__":
     
     logger.debug('거래 시작')
     
-    # Initialize PyQt application
-    app = QApplication(sys.argv)
-    
     try:
         # Create appropriate trading strategy
         strategy = TradingStrategyFactory.create_strategy(menu_code)
         
         # Create config dictionary based on command line arguments
         config = {
-            'trading_time': trading_time
+            'trading_time': trading_time,
+            'log_window': log_window  # Pass log window to strategy for progress updates
         }
         
         # Add manual trading parameters if needed
@@ -111,8 +114,10 @@ if __name__ == "__main__":
         
         # Execute trading strategy
         strategy.execute(config)
+        log_window.update_status("Trading completed")
     except Exception as err:
         logger.exception(err)
+        log_window.update_status("Error occurred")
     
     logger.debug("완료!")
     
@@ -120,5 +125,8 @@ if __name__ == "__main__":
     if menu_code in ['0', '1', '2', '3', '12', '16']:
         os.system("taskkill /im KaKaoTalk.exe")
         os.system(KAKAOTALK_PATH)
+    
+    # Start the event loop
+    sys.exit(app.exec_())
 
 

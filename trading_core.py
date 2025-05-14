@@ -40,7 +40,9 @@ STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
 BUY_NEW_STOCK = "신규종목매수"
 
-TR_REQ_TIME_INTERVAL = 0.3
+# Sleep intervals
+TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
+ORDER_SLEEP_INTERVAL = 0.4   # 주문 후 대기 시간
 
 ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, '매수취소': 3, '매도취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
@@ -407,7 +409,7 @@ class Trading:
                 if self._buy_designated_price(self.interesting_stocks[key], self.buy_new_stock_amount, -1, price):
                     buy_cnt += 1
                 logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-                sleep(0.5)
+                sleep(ORDER_SLEEP_INTERVAL)
         else:
             logger.debug('보유주식이 {}개이므로 더이상 신규매수할수 없습니다.'.format(self.user_stock_num))
 
@@ -438,7 +440,7 @@ class Trading:
             if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -0.1, price):
                 buy_cnt += 1
             logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-            sleep(0.5)
+            sleep(ORDER_SLEEP_INTERVAL)
 
     def _buy_current_price(self, stock_code, amount, buy_amount=None):
         # 일정 금액(amount)만큼 현재가로 매수
@@ -447,12 +449,11 @@ class Trading:
 
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
-        # num = int(buy_amount / price)
         if amount == 0:
             num = 1
         else:
             num = int(amount / price)
-        if buy_amount: # 보유금액
+        if buy_amount:
             if buy_amount + (num * price) > self.max_amount:
                 num = int((self.max_amount - buy_amount) / price)
         if num == 0:
@@ -461,7 +462,7 @@ class Trading:
 
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
         return True
 
@@ -472,15 +473,16 @@ class Trading:
 
         logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
-        if buy_amount: # 보유금액
+        if buy_amount:
             if buy_amount + (num * price) > self.max_amount:
                 num = int((self.max_amount - buy_amount) / price)
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
         return True
 
@@ -506,9 +508,10 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         return True
 
@@ -534,27 +537,15 @@ class Trading:
         if num == 0:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
+
         self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
                                num, price, HOGATYPE['지정가'], "03", "", "")
-
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         return True
 
     def _sell_current_price(self, stock, remain, sell_stock_amount):
         # 매도#
-        '''
-        #보유종목의 수익률이 10이상인 경우 전량 매도
-        if float(stock["earning_rate"]) >= SELL_ALL_EARNING_RATE \
-                and not self.is_stock_in_not_done_sell(stock['code']):
-            logger.debug("###현재가 정보 요청### : {}".format(stock))
-            price, name = self.get_current_price(stock['code'])
-            num = int(stock['possession_num'])
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['신규매도'], stock['code'],
-                                   num, price, HOGATYPE['지정가'], "")
-            sleep(1)
-            logger.debug("### 전량 매도!! 수량 : {}".format(num))'''
-        # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
 
@@ -568,9 +559,10 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -593,19 +585,19 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         if after_market:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
-        sleep(0.7)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_1_stock_current_price(self, stock, remain):
         # 매도#
-        # 보유종목의 수익률이 3 이상인 경우 현재가로 매도
         if 'J' in stock['code']:
             return
 
@@ -617,9 +609,10 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -640,13 +633,14 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         if after_market:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -667,13 +661,14 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         if after_market:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
                                    num, price, HOGATYPE['시간외단일가'], "")
         else:
             self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                    num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
@@ -693,15 +688,17 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
+
         self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                num, price, HOGATYPE['지정가'], "")
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_credit_designated_price_num(self, stock, sell_earning_rate, remain, num, after_market):
         if 'J' in stock['code']:
             return
+
         interest = float(stock['interest']) / int(stock['possession_num'])
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.5 = 수수료
         for pr, un in HOGAUNIT.items():
@@ -721,14 +718,14 @@ class Trading:
         else:
             self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                           num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
     def _sell_credit_hoga_num(self, stock, hoga, remain, num, after_market):
         if 'J' in stock['code']:
             return
+
         interest = float(stock['interest']) / int(stock['possession_num'])
         price = int(stock['buy_price']) * (1 + (0.3 / 100)) + interest  # 0.5 = 수수료
         price = int(price)
@@ -753,8 +750,7 @@ class Trading:
         else:
             self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
                                           num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-
-        sleep(0.5)
+        sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
