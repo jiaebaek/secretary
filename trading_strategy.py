@@ -1,25 +1,20 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from kiwoom import Kiwoom
 from logger import logger
-import datetime
 from time import sleep
-from main import Trading
+from trading_core import Trading
 
 class TradingStrategy(ABC):
     """Base abstract class for all trading strategies"""
     
-    def __init__(self, kiwoom: Kiwoom):
-        self.kiwoom = kiwoom
-        self.trading = Trading()  # Use Trading class from main.py
+    def __init__(self):
+        self.trading = Trading()  # Create Trading instance
         self.trading.update_options()  # Update trading options at initialization
         self.trading.set_exchange()  # Set exchange type at initialization
         self.user_stock_list = []
         self.user_stock_num = 0
         self.user_credit_stock_list = []
         self.user_credit_stock_num = 0
-        self.interesting_stocks = []
-        self.nxt_list = []
         
     @abstractmethod
     def execute(self, config: Dict[str, Any]) -> None:
@@ -30,12 +25,17 @@ class TradingStrategy(ABC):
         """Get user's stock information"""
         logger.debug('주식정보 가져오기')
         self.user_stock_list = self.trading.get_user_stock(after_market)
+        if not self.user_stock_list:
+            raise Exception('주식 보유 없음')
+
         self.user_stock_num = len(self.user_stock_list)
         
     def get_user_credit_stock(self, after_market=False):
         """Get user's credit stock information"""
         logger.debug('신용주식정보 가져오기')
         self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
+        if not self.user_stock_list:
+            raise Exception('주식 보유 없음')
         self.user_credit_stock_num = len(self.user_credit_stock_list)
 
     def _sell_all_stocks(self):
@@ -245,8 +245,8 @@ class TradingStrategyFactory:
     }
     
     @classmethod
-    def create_strategy(cls, menu_code: str, kiwoom: Kiwoom) -> TradingStrategy:
+    def create_strategy(cls, menu_code: str) -> TradingStrategy:
         strategy_class = cls._strategies.get(menu_code)
         if not strategy_class:
             raise ValueError(f"Invalid menu code: {menu_code}")
-        return strategy_class(kiwoom) 
+        return strategy_class() 
