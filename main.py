@@ -6,6 +6,7 @@ from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
 from trading_strategy import TradingStrategyFactory
+from config import KAKAOTALK_PATH
 
 
 menu = {
@@ -118,6 +119,6 @@ if __name__ == "__main__":
     # Cleanup tasks for certain menu codes
     if menu_code in ['0', '1', '2', '3', '12', '16']:
         os.system("taskkill /im KaKaoTalk.exe")
-        os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
+        os.system(KAKAOTALK_PATH)
 
 

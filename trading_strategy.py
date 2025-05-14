@@ -83,7 +83,6 @@ class AutoFullTradingStrategy(TradingStrategy):
         self._sell_all_credit_stocks()
 
 
-
 class AutoAveragingDownStrategy(TradingStrategy):
     """Strategy for menu '1': 자동-물타기-매수"""
     
