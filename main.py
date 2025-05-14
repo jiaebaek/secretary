@@ -9,6 +9,7 @@ import os
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
+from trading_strategy import TradingStrategyFactory
 
 ORDER_INTERVAL = "주문간격(초)"  # 주문 간격
 BUY_NEW_STOCK_AMOUNT = "신규매수주식금액"  # 신규매수 주식 금액
@@ -87,23 +88,6 @@ class Trading:
         self.new_buy_stock = True
         self.exchange = "KRX"
         self.nxt_list = []
-
-    def set_status_running(self):
-        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
-        cur = conn.cursor()
-
-        sql = '''update secretary_setup set value=1 where key="운영상태"'''
-        cur.execute(sql)
-        conn.close()
-
-    def get_status_running(self):
-        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
-        cur = conn.cursor()
-
-        cur.execute("select value from secretary_setup where key=\"운영상태\"")
-        rows = cur.fetchall()
-        self.running_state = rows[0][0]
-        conn.close()
 
     def update_options(self):
         conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
@@ -894,9 +878,6 @@ class Trading:
             self.nxt_list = self.kiwoom.get_code_list_by_market(self.exchange)
             logger.debug(f"NXT 거래소 종목 리스트 : {self.nxt_list}")
 
-argument = sys.argv
-
-
 menu = {
     '0': "자동-전체 (신용일반 주식 매도)",
     '1': "자동-물타기-매수",
@@ -905,32 +886,27 @@ menu = {
     '4': "수동-매도",
     '5': "수동-물타기-매수",
     '12': "자동-신용-주식-매도",
+    '12-1': "자동-신용-주식-매도-무한반복",
     '13': "자동-신용-주식-매수",
     '16': "자동-신용일반-주식-시간외NXT-매도"
 }
 
-formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
-if argument[2] =='test':
-    fileHandler = logging.FileHandler(LOG_FILE+'{}_{}_test.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu[argument[1]]))
-else:
-    fileHandler = logging.FileHandler(
-        LOG_FILE + '{}_{}.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu[argument[1]]))
-streamHandler = logging.StreamHandler()
+def setup_logging(menu_name):
+    formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
+    
+    log_filename = LOG_FILE + '{}_{}.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu_name)
+        
+    fileHandler = logging.FileHandler(log_filename)
+    streamHandler = logging.StreamHandler()
+    
+    fileHandler.setFormatter(formatter)
+    streamHandler.setFormatter(formatter)
+    
+    logger.addHandler(fileHandler)
+    logger.addHandler(streamHandler)
 
-file_max_bytes = 10 * 1024 * 1024
-fileHandler.setFormatter(formatter)
-streamHandler.setFormatter(formatter)
-
-logger.addHandler(fileHandler)
-logger.addHandler(streamHandler)
-
-if __name__ == "__main__":
-    argument = sys.argv  # 0: 물타기매수/신규매수/매도 1: 물타기매수 2: 매도 3: 신규매수
-
-    weekday = datetime.datetime.today().weekday()
-    logger.debug(weekday)
-
-    if argument[2] == 'normal':
+def check_trading_time(trading_time, weekday):
+    if trading_time == 'normal':
         if weekday in range(0, 5):
             now = datetime.datetime.now()
             now_tupule = now.timetuple()
@@ -945,8 +921,7 @@ if __name__ == "__main__":
                 exit(0)
         else:
             exit(0)
-
-    elif argument[2] == 'after_market':
+    elif trading_time == 'after_market':
         if weekday in range(0, 5):
             now = datetime.datetime.now()
             now_tupule = now.timetuple()
@@ -962,211 +937,56 @@ if __name__ == "__main__":
         else:
             exit(0)
 
+if __name__ == "__main__":
+    # Parse command line arguments
+    menu_code = sys.argv[1]
+    trading_time = sys.argv[2]  # normal or after_market 
+    menu_name = menu[menu_code]
+
+    
+    # Setup logging
+    setup_logging(menu_name)
+    
+    # Check if it's trading hours
+    weekday = datetime.datetime.today().weekday()
+    logger.debug(weekday)
+    check_trading_time(trading_time, weekday)
+    
     logger.debug('거래 시작')
-
+    
+    # Initialize PyQt application
     app = QApplication(sys.argv)
-    for _ in range(2):
-        try:
-            trade = Trading()
-            if trade:
-                break
-        except Exception as err:
-            logger.exception(err)
+    
+    # Try to initialize trading twice if needed
 
-
-    #trade.set_status_running()
-    # db에서 설정값 가져오기
     try:
-        logger.debug('DB 접속')
-        trade.update_options()
-
-        trade.set_exchange()
-
-        if argument[1] in ['4', '5']: # 수동
-            logger.debug('주식정보 가져오기')
-            trade.get_user_stock()
-
-            with open("D:\\OneDrive\\문서\\주식현황.csv", "a", encoding='utf-8', newline='') as f:
-                wr = csv.writer(f)
-                wr.writerow(["{}".format(datetime.datetime.today().strftime("%Y/%m/%d")), "{}".format(trade.user_stock_num)])
-
-            ## ---------------------------------- manual ------------------------------------------ ##
-
-            if argument[1] == '4':
-                logger.debug('>>>>>>>>>>>> 수동 매도 <<<<<<<<<<<<<<')
-                earning_rate = argument[3].strip('%')
-                num = argument[4].strip('ea')
-                for stock in trade.user_stock_list:
-                    remain = int(stock['available_num'])
-                    trade.sell_manual_stock(stock, earning_rate, remain, num)
-
-            elif argument[1] == '5':
-                logger.debug('>>>>>>>>>>>>수동 매수 <<<<<<<<<<<<<<')
-                trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-                logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
-                earning_rate = argument[3].strip('%')
-                num = argument[4].strip('ea')
-                for i in range(len(trade.user_stock_list)):
-                    # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
-                    stock = trade.user_stock_list[i]
-                    buy_amount = int(stock['buy_amount'])
-                    if buy_amount > trade.max_amount:
-                        logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
-                                                                                           trade.max_amount))
-                        continue
-                    if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                        trade.rebuy_manual_stock(stock, earning_rate, num)
-                    else:
-                        logger.debug("물타기 제외 종목입니다 : {}".format(stock))
-
-        else:  # 자동
-            ## ---------------------------------- auto ------------------------------------------ ##
-
-            if argument[1] == '1':
-                logger.debug('주식정보 가져오기')
-                trade.get_user_stock()
-
-                trade.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-                logger.debug('>>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<<<<')
-                logger.debug('물타기 제외 종목 들 : {}'.format(trade.except_rebuy_list))
-                for i in range(len(trade.user_stock_list)):
-                    # 보유종목의 매입금액 + 새로 매수할 금액이 MAX_AMOUNT만원이 넘는지 확인해서 MAX_AMOUNT만원에 맞추기
-                    stock = trade.user_stock_list[i]
-                    buy_amount = int(stock['buy_amount'])
-                    if buy_amount > trade.max_amount:
-                        logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
-                                                                                           trade.max_amount))
-                        continue
-                    if not trade.user_stock_list[i]['name'] in trade.except_rebuy_list:
-                        trade.rebuy_user_stock(stock)
-                        trade.rebuy_1_stock(stock)
-                    else:
-                        logger.debug("물타기 제외 종목입니다 : {}".format(stock))
-
-                sleep(0.5)
-
-            if argument[1] == '3':
-                logger.debug('주식정보 가져오기')
-                trade.get_user_stock()
-
-                if trade.new_buy_stock == 1:
-                    # 사용자 관심종목으로 부터 리스트 가져오기
-                    trade.get_interesting_stock()
-                    # 미체결 매수주문 정보 가져오기
-                    trade.get_not_done_order()
-                    # 미체결 매도주문 정보 가져오기
-                    #trade.get_not_done_sell()
-                    logger.debug('>>>>>>>>>>>> 신규 종목 매수 <<<<<<<<<<<<<<')
-                    trade.set_buy_stock_num()
-                    trade.buy_new_stock()
-
-                    sleep(0.5)
-
-            if argument[1] == '13':
-                logger.debug('신용 주식정보 가져오기')
-                trade.get_user_credit_stock()
-                logger.debug('일반 주식정보 가져오기')
-                trade.get_user_stock()
-
-                # 사용자 관심종목으로 부터 리스트 가져오기
-                trade.get_interesting_stock()
-                logger.debug('>>>>>>>>>>>> 신규 신용 종목 매수 <<<<<<<<<<<<<<')
-                trade.buy_new_credit_stock()
-                sleep(0.5)
-
-            if argument[1] == '16': # 시간외 거래
-                logger.debug('신용주식정보 가져오기')
-                trade.get_user_credit_stock(after_market=True)
-
-                logger.debug('>>>>>>>>>>>> 일괄 신용 시간외 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_credit_stock_list:
-                    remain = int(stock['possession_num'])
-                    for i in range(len(trade.sell_credit_hoga_after_market)):
-                        if trade.sell_credit_hoga_after_market[i] == 0:
-                            break
-                        if remain == 0:
-                            break
-                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga_after_market[i], remain,
-                                                       int(stock['possession_num']), after_market=True)  # 전량 매도
-                    logger.debug("남은 주식 수 : {}".format(remain))
-
-                logger.debug('일반주식정보 가져오기')
-                trade.get_user_stock(after_market=True)
-                logger.debug('>>>>>>>>>>>> 일괄 시간외 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_stock_list:
-                    remain = int(stock['available_num'])
-                    logger.debug(remain)
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[0], remain,
-                                                   trade.sell_stock_amount[0], after_market=True)
-                    remain = trade.sell_user_stock(stock, trade.sell_earning_rate[1], remain,
-                                                   trade.sell_stock_amount[1], after_market=True)
-
-            if argument[1] == '0' or argument[1] == '2' or argument[1] == '16':
-                logger.debug('주식정보 가져오기')
-                trade.get_user_stock()
-
-                logger.debug('>>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_stock_list:
-                    if trade.exchange == 'NXT' and stock['code'] not in trade.nxt_list:
-                        continue
-                    remain = int(stock['available_num'])
-                    for i in range(len(trade.sell_earning_rate)):
-                        if trade.sell_earning_rate[i] == 0:
-                            break
-                        if remain == 0:
-                            break
-                        remain = trade.sell_user_stock(stock, trade.sell_earning_rate[i], remain,
-                                                       trade.sell_stock_amount[i])
-                    logger.debug("남은 주식 수 : {}".format(remain))
-
-            if argument[1] == '0' or argument[1] == '12' or argument[1] == '16':
-                logger.debug('신용주식정보 가져오기')
-                trade.get_user_credit_stock()
-
-                logger.debug('>>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<<<<')
-                for stock in trade.user_credit_stock_list:
-                    if trade.exchange == 'NXT' and stock['code'] not in trade.nxt_list:
-                        continue
-                    remain = int(stock['possession_num'])
-                    for i in range(len(trade.sell_credit_hoga)):
-                        if trade.sell_credit_hoga[i] == 0:
-                            break
-                        if remain == 0:
-                            break
-                        remain = trade.sell_manual_credit_stock(stock, trade.sell_credit_hoga[i], remain,
-                                                       int(stock['possession_num'])) # 전량 매도
-                    logger.debug("남은 주식 수 : {}".format(remain))
-
-
+        # Initialize Kiwoom
+        kiwoom = Kiwoom()
+        kiwoom.comm_connect()
+        
+        # Create appropriate trading strategy
+        strategy = TradingStrategyFactory.create_strategy(menu_code, kiwoom)
+        
+        # Create config dictionary based on command line arguments
+        config = {
+            'trading_time': trading_time
+        }
+        
+        # Add manual trading parameters if needed
+        if menu_code in ['4', '5']:
+            config['earning_rate'] = sys.argv[3].strip('%')
+            config['num'] = sys.argv[4].strip('ea')
+        
+        # Execute trading strategy
+        strategy.execute(config)
     except Exception as err:
         logger.exception(err)
-
+    
     logger.debug("완료!")
-
-    if argument[1] in ['0', '1', '2', '3' '12', '16']:
+    
+    # Cleanup tasks for certain menu codes
+    if menu_code in ['0', '1', '2', '3', '12', '16']:
         os.system("taskkill /im KaKaoTalk.exe")
         os.system("C:\\PycharmProjects\\secretary\\카카오톡.lnk")
 
-    '''
 
-    # db에서 동작여부 확인하기
-
-    logger.debug(
-        '==================================================================================================')
-    try:
-        trade.get_user_stock()
-        # 미체결 매수주문 정보 가져오기
-        #trade.get_not_done_order()
-        # 미체결 매도주문 정보 가져오기
-        #trade.get_not_done_sell()
-        #logger.debug('>>>>>>>>>>>> 신규매수 <<<<<<<<<<<<<<')
-        #trade.set_buy_stock_num()
-        #trade.buy_new_stock()
-        logger.debug('>>>>>>>>>>>> 종목별 추가매수 / 매도 <<<<<<<<<<<<<<')
-        for i in range(len(trade.user_stock_list)):
-            trade.buy_user_stock(trade.user_stock_list[i])
-            #trade.sell_user_stock(trade.user_stock_list[i])
-        logger.debug('>>>>>>>>>>>> 모든 주식 체크 완료 <<<<<<<<<<<<<<')
-    except Exception as err:
-        logger.debug(err)
-'''
