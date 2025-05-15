@@ -1,3 +1,4 @@
+from config import DB_PATH
 from kiwoom import Kiwoom
 from logger import logger
 import sqlite3
@@ -85,7 +86,7 @@ class Trading:
         self.nxt_list = []
 
     def update_options(self):
-        conn = sqlite3.connect("D:\PycharmProjects/secretary_web/db.sqlite3")
+        conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
 
         cur.execute("select * from secretary_setup")
