@@ -1,1 +1,0 @@
-C:\ProgramData\Anaconda3\python.exe C:\Users\deser\PycharmProjects\secretary\main.py 1 test

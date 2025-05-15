@@ -119,7 +119,7 @@ class TradingStrategy(ABC):
                 self.log_window.update_progress(completed_credit, total_credit_stocks)
     
 
-class AutoFullTradingStrategy(TradingStrategy):
+class AutoBothSellingStrategy(TradingStrategy):
     """Strategy for menu '0': 자동-전체 (신용일반 주식 매도)"""
     
     def execute(self, config: Dict[str, Any]) -> None:
@@ -305,6 +305,21 @@ class AutoAfterMarketStrategy(TradingStrategy):
         self._sell_all_stocks_after_market()
 
 
+class AutoBothAfterMarketStrategy(TradingStrategy):
+    """Strategy for menu '22': 자동-일반-신용-주식-시간외-매도"""
+    
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+
+        # After market credit stock selling
+        self.get_user_credit_stock(after_market=True)
+        self._sell_all_credit_stocks_after_market()
+        
+        # After market regular stock selling
+        self.get_user_stock(after_market=True)
+        self._sell_all_stocks_after_market()
+
+
 class AutoCreditSellingLoopStrategy(TradingStrategy):
     """Strategy for menu '12-1': 자동-신용-주식-매도-무한반복"""
     
@@ -321,7 +336,7 @@ class TradingStrategyFactory:
     """Factory class to create appropriate trading strategy"""
     
     _strategies = {
-        '0': AutoFullTradingStrategy,
+        '0': AutoBothSellingStrategy,
         '1': AutoAveragingDownStrategy,
         '2': AutoSellingStrategy,
         '3': AutoNewBuyingStrategy,
@@ -332,7 +347,8 @@ class TradingStrategyFactory:
         '12-1': AutoCreditSellingLoopStrategy,
         '13': AutoCreditBuyingStrategy,
         '16': AutoAfterMarketNXTTradingStrategy,
-        '17': AutoCreditAfterMarketStrategy
+        '17': AutoCreditAfterMarketStrategy,
+        '22': AutoBothAfterMarketStrategy
     }
     
     @classmethod

@@ -1,1 +1,0 @@
-C:\Users\user1\anaconda3\envs\ENV_NAME\python.exe D:\PycharmProjects\secretary\main.py 4 test 2% 2ea
