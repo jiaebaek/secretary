@@ -43,7 +43,7 @@ class TradingStrategy(ABC):
 
     def _sell_all_stocks(self):
         """Sell all stocks in the given list according to configured sell rates"""
-        logger.debug('>>>>>>>>>>> 일괄 매도 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 현금주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
         for stock in self.user_stock_list:
@@ -63,7 +63,7 @@ class TradingStrategy(ABC):
             logger.debug("남은 주식 수 : {}".format(remain))
 
     def _sell_all_credit_stocks(self):
-        logger.debug('>>>>>>>>>>> 일괄 신용 매도 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 신용주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_credit_stock_list)
         completed = 0
         for stock in self.user_credit_stock_list:
@@ -82,6 +82,42 @@ class TradingStrategy(ABC):
                 self.log_window.update_progress(completed, total_stocks)
             logger.debug("남은 주식 수 : {}".format(remain))
 
+    def _sell_all_stocks_after_market(self):
+        """Sell all stocks in the given list according to configured sell rates"""
+        logger.debug('>>>>>>>>>>> 현금주식 시간외 매도 <<<<<<<<<<<')
+        total_stocks = len(self.user_stock_list)
+        completed = 0
+        
+        for stock in self.user_stock_list:
+            remain = int(stock['available_num'])
+            remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[0], remain,
+                                            self.trading.sell_stock_amount[0], after_market=True)
+            remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[1], remain,
+                                            self.trading.sell_stock_amount[1], after_market=True)
+            completed += 1
+            if self.log_window:
+                self.log_window.update_progress(completed, total_stocks)
+            logger.debug("남은 주식 수 : {}".format(remain))
+        
+    def _sell_all_credit_stocks_after_market(self):
+        """Sell all credit stocks in the given list according to configured sell rates"""
+        logger.debug('>>>>>>>>>>> 신용주식 시간외 매도 <<<<<<<<<<<')
+        total_credit_stocks = len(self.user_credit_stock_list)
+        completed_credit = 0
+        
+        for stock in self.user_credit_stock_list:
+            remain = int(stock['possession_num'])
+            for i in range(len(self.trading.sell_credit_hoga_after_market)):
+                if self.trading.sell_credit_hoga_after_market[i] == 0:
+                    break
+                if remain == 0:
+                    break
+                remain = self.trading.sell_manual_credit_stock(stock, self.trading.sell_credit_hoga_after_market[i], remain,
+                                                int(stock['possession_num']), after_market=True)
+            completed_credit += 1
+            if self.log_window:
+                self.log_window.update_progress(completed_credit, total_credit_stocks)
+    
 
 class AutoFullTradingStrategy(TradingStrategy):
     """Strategy for menu '0': 자동-전체 (신용일반 주식 매도)"""
@@ -104,7 +140,7 @@ class AutoAveragingDownStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self.get_user_stock()
-        logger.debug('>>>>>>>>>>> 일괄 매수 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 현금주식 추가 매수 <<<<<<<<<<<')
         self.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
         logger.debug('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
         
@@ -135,22 +171,7 @@ class AutoSellingStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self.get_user_stock()
-        total_stocks = len(self.user_stock_list)
-        completed = 0
-        
-        for stock in self.user_stock_list:
-            remain = int(stock['available_num'])
-            for i in range(len(self.trading.sell_earning_rate)):
-                if self.trading.sell_earning_rate[i] == 0:
-                    break
-                if remain == 0:
-                    break
-                remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[i], remain,
-                                                self.trading.sell_stock_amount[i])
-            completed += 1
-            if self.log_window:
-                self.log_window.update_progress(completed, total_stocks)
-            logger.debug("남은 주식 수 : {}".format(remain))
+        self._sell_all_stocks()
 
 
 class AutoNewBuyingStrategy(TradingStrategy):
@@ -163,7 +184,7 @@ class AutoNewBuyingStrategy(TradingStrategy):
             self.trading.get_interesting_stock()
             self.trading.get_not_done_order()
             
-            logger.debug('>>>>>>>>>>>> 신규 종목 매수 <<<<<<<<<<<<<<')
+            logger.debug('>>>>>>>>>>>> 현금주식 신규 매수 <<<<<<<<<<<<<<')
             self.trading.set_buy_stock_num()
             self.trading.buy_new_stock()
 
@@ -176,7 +197,7 @@ class ManualSellingStrategy(TradingStrategy):
         self.get_user_stock()
         earning_rate = config.get('earning_rate')
         num = config.get('num')
-        logger.debug('>>>>>>>>>>> 수동 매도 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 수동 설정 현금주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
         
@@ -198,7 +219,7 @@ class ManualAveragingDownStrategy(TradingStrategy):
         logger.debug('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
         earning_rate = config.get('earning_rate')
         num = config.get('num')
-        logger.debug('>>>>>>>>>>> 수동 매수 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 수동 설정 현금주식 물타기 매수 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
         
@@ -236,12 +257,12 @@ class AutoCreditBuyingStrategy(TradingStrategy):
         self.get_user_credit_stock()
         self.get_user_stock()
         
-        logger.debug('>>>>>>>>>>>> 신규 신용 종목 매수 <<<<<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>>> 신용주식 신규 매수 <<<<<<<<<<<<<<')
         self.trading.get_interesting_stock()
         self.trading.buy_new_credit_stock()
 
 
-class AutoCreditAfterMarketStrategy(TradingStrategy):
+class AutoAfterMarketNXTTradingStrategy(TradingStrategy):
     """Strategy for menu '16': 자동-신용일반-주식-시간외NXT-매도"""
     
     def execute(self, config: Dict[str, Any]) -> None:
@@ -249,45 +270,40 @@ class AutoCreditAfterMarketStrategy(TradingStrategy):
         
         # After market credit stock selling
         self.get_user_credit_stock(after_market=True)
-        logger.debug('>>>>>>>>>>> 일괄 신용 시간외 매도 <<<<<<<<<<<')
-        total_credit_stocks = len(self.user_credit_stock_list)
-        completed_credit = 0
-        
-        for stock in self.user_credit_stock_list:
-            remain = int(stock['possession_num'])
-            for i in range(len(self.trading.sell_credit_hoga_after_market)):
-                if self.trading.sell_credit_hoga_after_market[i] == 0:
-                    break
-                if remain == 0:
-                    break
-                remain = self.trading.sell_manual_credit_stock(stock, self.trading.sell_credit_hoga_after_market[i], remain,
-                                                int(stock['possession_num']), after_market=True)
-            completed_credit += 1
-            if self.log_window:
-                self.log_window.update_progress(completed_credit, total_credit_stocks)
+        self._sell_all_credit_stocks_after_market()
         
         # After market regular stock selling
         self.get_user_stock(after_market=True)
-        logger.debug('>>>>>>>>>>> 일괄 시간외 매도 <<<<<<<<<<<')
-        total_stocks = len(self.user_stock_list)
-        completed = 0
-        
-        for stock in self.user_stock_list:
-            remain = int(stock['available_num'])
-            remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[0], remain,
-                                            self.trading.sell_stock_amount[0], after_market=True)
-            remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[1], remain,
-                                            self.trading.sell_stock_amount[1], after_market=True)
-            completed += 1
-            if self.log_window:
-                self.log_window.update_progress(completed, total_stocks)
-            logger.debug("남은 주식 수 : {}".format(remain))
+        self._sell_all_stocks_after_market()
 
         self.get_user_stock()
         self._sell_all_stocks()
 
         self.get_user_credit_stock()
         self._sell_all_credit_stocks()
+
+
+class AutoCreditAfterMarketStrategy(TradingStrategy):
+    """Strategy for menu '17': 자동-신용-주식-시간외-매도"""
+    
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        
+        # After market credit stock selling
+        self.get_user_credit_stock(after_market=True)
+        self._sell_all_credit_stocks_after_market()
+
+
+class AutoAfterMarketStrategy(TradingStrategy):
+    """Strategy for menu '7': 자동-일반-주식-시간외-매도"""
+    
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+
+        # After market regular stock selling
+        self.get_user_stock(after_market=True)
+        self._sell_all_stocks_after_market()
+
 
 class AutoCreditSellingLoopStrategy(TradingStrategy):
     """Strategy for menu '12-1': 자동-신용-주식-매도-무한반복"""
@@ -297,7 +313,7 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
         while True:
             self.get_user_credit_stock()
             self._sell_all_credit_stocks()
-            logger.debug('>>>>>>>>>>> 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
+            logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
             sleep(self.trading.order_interval)
 
 
@@ -311,10 +327,12 @@ class TradingStrategyFactory:
         '3': AutoNewBuyingStrategy,
         '4': ManualSellingStrategy,
         '5': ManualAveragingDownStrategy,
+        '7': AutoAfterMarketStrategy,
         '12': AutoCreditSellingStrategy,
         '12-1': AutoCreditSellingLoopStrategy,
         '13': AutoCreditBuyingStrategy,
-        '16': AutoCreditAfterMarketStrategy
+        '16': AutoAfterMarketNXTTradingStrategy,
+        '17': AutoCreditAfterMarketStrategy
     }
     
     @classmethod
