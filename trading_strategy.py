@@ -37,7 +37,7 @@ class TradingStrategy(ABC):
         """Get user's credit stock information"""
         logger.debug('신용주식정보 가져오기')
         self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
-        if not self.user_stock_list:
+        if not self.user_credit_stock_list:
             raise Exception('주식 보유 없음')
         self.user_credit_stock_num = len(self.user_credit_stock_list)
 
