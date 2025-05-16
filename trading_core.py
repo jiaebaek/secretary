@@ -859,7 +859,10 @@ class Trading:
         now_tupule = now.timetuple()
         logger.debug(now_tupule)
         if now_tupule.tm_hour < 9:
-            self.exchange = "NXT"
+            if now_tupule.tm_min < 30:
+                self.exchange = "NXT"
+            else:
+                self.exchange = "KRX"
         elif now_tupule.tm_hour < 15:
             self.exchange = "KRX"
         else:
