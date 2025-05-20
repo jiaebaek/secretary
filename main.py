@@ -124,11 +124,6 @@ if __name__ == "__main__":
     
     logger.debug("완료!")
     
-    # Cleanup tasks for certain menu codes
-    if menu_code in ['0', '1', '2', '3', '12', '16']:
-        os.system("taskkill /im KaKaoTalk.exe")
-        os.system(KAKAOTALK_PATH)
-    
     # Start the event loop
     sys.exit(app.exec_())
 
