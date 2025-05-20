@@ -329,7 +329,6 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
             self.get_user_credit_stock()
             self._sell_all_credit_stocks()
             logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
-            sleep(self.trading.order_interval)
 
 
 class TradingStrategyFactory:
