@@ -1,12 +1,11 @@
 from time import sleep
 import sys
 from PyQt5.QtWidgets import *
-import os
+from PyQt5.QtGui import QIcon
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
 from trading_strategy import TradingStrategyFactory
-from config import KAKAOTALK_PATH
 from log_viewer import LogWindow
 
 
@@ -87,6 +86,7 @@ if __name__ == "__main__":
     
     # Create and show log window
     log_window = LogWindow()
+    log_window.setWindowIcon(QIcon('Trading_Secretary_Icon.ico'))  # Set window icon
     log_window.show()
     log_window.update_status(f"Running: {menu_name}")
     
@@ -126,5 +126,4 @@ if __name__ == "__main__":
     
     # Start the event loop
     sys.exit(app.exec_())
-
 
