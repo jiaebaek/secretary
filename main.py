@@ -2,6 +2,8 @@ from time import sleep
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon
+
+from config import LOGO_PATH
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
@@ -86,7 +88,7 @@ if __name__ == "__main__":
     
     # Create and show log window
     log_window = LogWindow()
-    log_window.setWindowIcon(QIcon('Trading_Secretary_Icon.ico'))  # Set window icon
+    log_window.setWindowIcon(QIcon(LOGO_PATH))  # Set window icon
     log_window.show()
     log_window.update_status(f"Running: {menu_name}")
     
