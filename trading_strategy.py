@@ -71,12 +71,14 @@ class TradingStrategy(ABC):
                 continue
             remain = int(stock['possession_num'])
             for i in range(len(self.trading.sell_credit_hoga)):
+                logger.debug(f"len : {len(self.trading.sell_credit_hoga)}")
                 if self.trading.sell_credit_hoga[i] == 0:
                     break
                 if remain == 0:
                     break
+                    # 호가 대신 수익률로 매도
                 remain = self.trading.sell_manual_credit_stock(stock, self.trading.sell_credit_hoga[i], remain,
-                                                int(stock['possession_num'])) # 전량 매도
+                                                               int(stock['possession_num']), after_market=False)
             completed += 1
             if self.log_window:
                 self.log_window.update_progress(completed, total_stocks)
@@ -112,6 +114,7 @@ class TradingStrategy(ABC):
                     break
                 if remain == 0:
                     break
+                # 호가 대신 수익률로 매도
                 remain = self.trading.sell_manual_credit_stock(stock, self.trading.sell_credit_hoga_after_market[i], remain,
                                                 int(stock['possession_num']), after_market=True)
             completed_credit += 1

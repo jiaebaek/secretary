@@ -176,7 +176,7 @@ class Trading:
         for row in rows:
             if not row[1]:
                 continue
-            if row[0] == SELL_HOGA_1:
+            if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
                 self.sell_credit_hoga[0] = row[1]
 
         cur.execute("select * from 신용시간외매도설정")
@@ -184,7 +184,7 @@ class Trading:
         for row in rows:
             if not row[1]:
                 continue
-            if row[0] == SELL_HOGA_1:
+            if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
                 self.sell_credit_hoga_after_market[0] = row[1]
 
         cur.execute("select * from secretary_stockdownrate")
@@ -571,7 +571,7 @@ class Trading:
         if 'J' in stock['code']:
             return
 
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
@@ -701,7 +701,7 @@ class Trading:
             return
 
         interest = float(stock['interest']) / int(stock['possession_num'])
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.5 = 수수료
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.3 = 수수료
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
@@ -830,17 +830,22 @@ class Trading:
                                                                                 remain))
         return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain, after_market)
 
-    def sell_manual_credit_stock(self, stock, hoga, remain, sell_stock_num, after_market=False):
+    def sell_manual_credit_stock(self, stock, sell_earning_rate, remain, sell_stock_num, after_market=False):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}호가  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(hoga, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                  stock['name'],
+                                                                                                  stock['earning_rate'],
+                                                                                                  int(stock[
+                                                                                                          'buy_price']),
+                                                                                                  int(stock[
+                                                                                                          'buy_amount']),
+                                                                                                  remain))
 
-        return self._sell_credit_hoga_num(stock, int(hoga), remain, int(sell_stock_num), after_market)
+        return self._sell_credit_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num),
+                                                      after_market)
 
     def sell_manual_stock(self, stock, sell_earning_rate, remain, sell_stock_num):
         # 매도#
@@ -855,6 +860,9 @@ class Trading:
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
     def set_exchange(self):
+        self.exchange = 'KRX'
+        return
+
         now = datetime.datetime.now()
         now_tupule = now.timetuple()
         logger.debug(now_tupule)
