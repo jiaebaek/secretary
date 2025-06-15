@@ -571,7 +571,7 @@ class Trading:
         if 'J' in stock['code']:
             return
 
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 1) / 100))
         for pr, un in HOGAUNIT.items():
             if price < pr:
                 unit = un
