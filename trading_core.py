@@ -72,8 +72,10 @@ class Trading:
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.sell_credit_hoga = [0]
-        self.sell_credit_hoga_after_market = [0]
+        self.sell_credit_hoga = [0, 0]
+        self.sell_credit_hoga_after_market = [0, 0]
+        self.sell_credit_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.sell_credit_stock_amount_after_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
         self.default_buy_new_stock_num = 100
@@ -178,6 +180,12 @@ class Trading:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
                 self.sell_credit_hoga[0] = row[1]
+            elif row[0] == SELL_EARNING_RATE_2:
+                self.sell_credit_hoga[1] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_1:
+                self.sell_credit_stock_amount[0] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_2:
+                self.sell_credit_stock_amount[1] = row[1]
 
         cur.execute("select * from 신용시간외매도설정")
         rows = cur.fetchall()
@@ -186,6 +194,12 @@ class Trading:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
                 self.sell_credit_hoga_after_market[0] = row[1]
+            elif row[0] == SELL_EARNING_RATE_2:
+                self.sell_credit_hoga_after_market[1] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_1:
+                self.sell_credit_stock_amount_after_market[0] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_2:
+                self.sell_credit_stock_amount_after_market[1] = row[1]
 
         cur.execute("select * from secretary_stockdownrate")
         rows = cur.fetchall()
@@ -696,6 +710,37 @@ class Trading:
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
 
+    def _sell_credit_designated_price(self, stock, sell_earning_rate, remain, sell_stock_amount, after_market):
+        if 'J' in stock['code']:
+            return
+
+        interest = float(stock['interest']) / int(stock['possession_num'])
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.3 = 수수료
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit) + 1
+        price = int(price * unit)
+        num = int(sell_stock_amount / price)
+        if num == 0:
+            num = 1
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
+
+        if after_market:
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
+                                        num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+        else:
+            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
+                                          num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
+        sleep(ORDER_SLEEP_INTERVAL)
+        logger.debug("------- 신용 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
+        return remain - num
+
     def _sell_credit_designated_price_num(self, stock, sell_earning_rate, remain, num, after_market):
         if 'J' in stock['code']:
             return
@@ -722,7 +767,7 @@ class Trading:
         sleep(ORDER_SLEEP_INTERVAL)
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         return remain - num
-
+    
     def _sell_credit_hoga_num(self, stock, hoga, remain, num, after_market):
         if 'J' in stock['code']:
             return
@@ -796,6 +841,18 @@ class Trading:
                                                                                 remain))
 
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount, after_market)
+    
+    def sell_user_credit_stock(self, stock, sell_earning_rate, remain, sell_stock_amount, after_market=False):
+        # 매도#
+        # 지정 수익률 이상 가격으로 매도
+
+        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
+                                                                               stock['earning_rate'],
+                                                                               int(stock['buy_price']),
+                                                                                int(stock['buy_amount']),
+                                                                                remain))
+
+        return self._sell_credit_designated_price(stock, sell_earning_rate, remain, sell_stock_amount, after_market)
 
     def sell_1_stock(self, stock, sell_earning_rate, remain, after_market=False):
         # 매도#
@@ -838,10 +895,8 @@ class Trading:
             "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
                                                                                                   stock['name'],
                                                                                                   stock['earning_rate'],
-                                                                                                  int(stock[
-                                                                                                          'buy_price']),
-                                                                                                  int(stock[
-                                                                                                          'buy_amount']),
+                                                                                                  int(stock['buy_price']),
+                                                                                                  int(stock['buy_amount']),
                                                                                                   remain))
 
         return self._sell_credit_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num),
@@ -860,9 +915,6 @@ class Trading:
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
     def set_exchange(self):
-        self.exchange = 'KRX'
-        return
-
         now = datetime.datetime.now()
         now_tupule = now.timetuple()
         logger.debug(now_tupule)
