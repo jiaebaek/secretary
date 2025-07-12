@@ -45,7 +45,7 @@ BUY_NEW_STOCK = "신규종목매수"
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
 ORDER_SLEEP_INTERVAL = 0.4   # 주문 후 대기 시간
 
-ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, '매수취소': 3, '매도취소': 4,
+ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, 'KRX취소': 3, 'KRX취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
              'NXT매수': 21, 'NXT매도': 22, 'NXT취소': 23, 'NXT정정': 25}
 HOGATYPE = {'지정가': "00", '시장가': "03", '시간외단일가': "62"}
@@ -363,6 +363,11 @@ class Trading:
             exchange = 2
         else:
             exchange = 1
+
+        self.account = self.kiwoom.get_login_info()
+        self.account = self.account.split(';')[0]
+        logger.debug('계좌번호 : {}'.format(self.account))
+
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("체결구분", 1)
         self.kiwoom.set_input_value("매매구분", 2)
@@ -378,6 +383,11 @@ class Trading:
             exchange = 2
         else:
             exchange = 1
+
+        self.account = self.kiwoom.get_login_info()
+        self.account = self.account.split(';')[0]
+        logger.debug('계좌번호 : {}'.format(self.account))
+
         self.kiwoom.set_input_value("계좌번호", self.account)
         self.kiwoom.set_input_value("체결구분", 1)
         self.kiwoom.set_input_value("매매구분", 1)
@@ -925,6 +935,12 @@ class Trading:
                                                                                 remain))
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
+
+    def cancel_not_done_sell_order(self, origin_order_num):
+        logger.debug("### 미체결 주문 취소")
+
+        return self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'취소'], "0",
+                               0, 0, "0", origin_order_num)
 
     def set_exchange(self):
         now = datetime.datetime.now()

@@ -142,6 +142,12 @@ class TradingStrategy(ABC):
             completed_credit += 1
             if self.log_window:
                 self.log_window.update_progress(completed_credit, total_credit_stocks)
+
+    def _cancel_sell_order(self):
+        logger.debug('>>>>>>>>>>> 미체결 매도 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_sell()
+        for order in self.trading.not_done_sell:
+            self.trading.cancel_not_done_sell_order(order)
     
 
 class AutoBothSellingStrategy(TradingStrategy):
@@ -358,10 +364,16 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
     
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-        while True:
-            self.get_user_credit_stock()
-            self._sell_all_credit_stocks()
-            logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
+        self.get_user_credit_stock()
+        self._sell_all_credit_stocks_finish_market()
+
+
+class CancelOrderStrategy(TradingStrategy):
+    """Strategy for menu '30': 미체결 주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_sell_order()
 
 
 class TradingStrategyFactory:
@@ -381,7 +393,8 @@ class TradingStrategyFactory:
         '16': AutoAfterMarketNXTTradingStrategy,
         '17': AutoCreditAfterMarketStrategy,
         '18': AutoCreditBeforeFinishMarketSellingStrategy,
-        '22': AutoBothAfterMarketStrategy
+        '22': AutoBothAfterMarketStrategy,
+        '30': CancelOrderStrategy
     }
     
     @classmethod
