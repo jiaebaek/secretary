@@ -1,1 +1,1 @@
-C:\Users\user1\anaconda3\envs\ENV_NAME\python.exe D:\PycharmProjects\secretary_v2\main.py 22 normal
+C:\Users\user1\anaconda3\envs\quant\python.exe D:\PycharmProjects\secretary_v2\main.py 22 normal

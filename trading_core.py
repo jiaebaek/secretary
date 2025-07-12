@@ -72,9 +72,11 @@ class Trading:
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.sell_credit_hoga = [0, 0]
-        self.sell_credit_hoga_after_market = [0, 0]
+        self.sell_credit_earning_rate = [0, 0]
+        self.sell_credit_earning_rate_finish_market = [0, 0]
+        self.sell_credit_earninig_rate_after_market = [0, 0]
         self.sell_credit_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.sell_credit_stock_amount_finish_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.sell_credit_stock_amount_after_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
@@ -179,13 +181,23 @@ class Trading:
             if not row[1]:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
-                self.sell_credit_hoga[0] = row[1]
+                self.sell_credit_earning_rate[0] = row[1]
             elif row[0] == SELL_EARNING_RATE_2:
-                self.sell_credit_hoga[1] = row[1]
+                self.sell_credit_earning_rate[1] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_1:
                 self.sell_credit_stock_amount[0] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_2:
                 self.sell_credit_stock_amount[1] = row[1]
+
+        cur.execute("select * from 신용장마감매도설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
+                self.sell_credit_earning_rate_finish_market[0] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_1:
+                self.sell_credit_stock_amount_finish_market[0] = row[1]
 
         cur.execute("select * from 신용시간외매도설정")
         rows = cur.fetchall()
@@ -193,9 +205,9 @@ class Trading:
             if not row[1]:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
-                self.sell_credit_hoga_after_market[0] = row[1]
+                self.sell_credit_earninig_rate_after_market[0] = row[1]
             elif row[0] == SELL_EARNING_RATE_2:
-                self.sell_credit_hoga_after_market[1] = row[1]
+                self.sell_credit_earninig_rate_after_market[1] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_1:
                 self.sell_credit_stock_amount_after_market[0] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_2:

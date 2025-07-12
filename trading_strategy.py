@@ -70,15 +70,37 @@ class TradingStrategy(ABC):
             if self.trading.exchange == 'NXT' and stock['code'] not in self.trading.nxt_list:
                 continue
             remain = int(stock['possession_num'])
-            for i in range(len(self.trading.sell_credit_hoga)):
-                logger.debug(f"len : {len(self.trading.sell_credit_hoga)}")
-                if self.trading.sell_credit_hoga[i] == 0:
+            for i in range(len(self.trading.sell_credit_earning_rate)):
+                logger.debug(f"len : {len(self.trading.sell_credit_earning_rate)}")
+                if self.trading.sell_credit_earning_rate[i] == 0:
                     break
                 if remain == 0:
                     break
                     # 호가 대신 수익률로 매도
-                remain = self.trading.sell_user_credit_stock(stock, self.trading.sell_credit_hoga[i], remain,
-                                                               self.trading.sell_credit_stock_amount[i], after_market=False)
+                remain = self.trading.sell_user_credit_stock(stock, self.trading.sell_credit_earning_rate[i], remain,
+                                                             self.trading.sell_credit_stock_amount[i], after_market=False)
+            completed += 1
+            if self.log_window:
+                self.log_window.update_progress(completed, total_stocks)
+            logger.debug("남은 주식 수 : {}".format(remain))
+
+    def _sell_all_credit_stocks_finish_market(self):
+        logger.debug('>>>>>>>>>>> 신용주식 매도 (장마감전 정리용) <<<<<<<<<<<')
+        total_stocks = len(self.user_credit_stock_list)
+        completed = 0
+        for stock in self.user_credit_stock_list:
+            if self.trading.exchange == 'NXT' and stock['code'] not in self.trading.nxt_list:
+                continue
+            remain = int(stock['possession_num'])
+            for i in range(len(self.trading.sell_credit_earning_rate_finish_market)):
+                logger.debug(f"len : {len(self.trading.sell_credit_earning_rate_finish_market)}")
+                if self.trading.sell_credit_earning_rate_finish_market[i] == 0:
+                    break
+                if remain == 0:
+                    break
+                    # 호가 대신 수익률로 매도
+                remain = self.trading.sell_user_credit_stock(stock, self.trading.sell_credit_earning_rate_finish_market[i], remain,
+                                                             self.trading.sell_credit_stock_amount_finish_market[i], after_market=False)
             completed += 1
             if self.log_window:
                 self.log_window.update_progress(completed, total_stocks)
@@ -109,14 +131,14 @@ class TradingStrategy(ABC):
         
         for stock in self.user_credit_stock_list:
             remain = int(stock['possession_num'])
-            for i in range(len(self.trading.sell_credit_hoga_after_market)):
-                if self.trading.sell_credit_hoga_after_market[i] == 0:
+            for i in range(len(self.trading.sell_credit_earninig_rate_after_market)):
+                if self.trading.sell_credit_earninig_rate_after_market[i] == 0:
                     break
                 if remain == 0:
                     break
                 # 호가 대신 수익률로 매도
-                remain = self.trading.sell_user_credit_stock(stock, self.trading.sell_credit_hoga_after_market[i], remain,
-                                                self.trading.sell_credit_stock_amount_after_market[i], after_market=True)
+                remain = self.trading.sell_user_credit_stock(stock, self.trading.sell_credit_earninig_rate_after_market[i], remain,
+                                                             self.trading.sell_credit_stock_amount_after_market[i], after_market=True)
             completed_credit += 1
             if self.log_window:
                 self.log_window.update_progress(completed_credit, total_credit_stocks)
@@ -297,6 +319,14 @@ class AutoCreditAfterMarketStrategy(TradingStrategy):
         self._sell_all_credit_stocks_after_market()
 
 
+class AutoCreditBeforeFinishMarketSellingStrategy(TradingStrategy):
+    """Strategy for menu '18': 자동-신용-주식-장마감전-매도"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self.get_user_credit_stock()
+        self._sell_all_credit_stocks_finish_market()
+
 class AutoAfterMarketStrategy(TradingStrategy):
     """Strategy for menu '7': 자동-일반-주식-시간외-매도"""
     
@@ -350,6 +380,7 @@ class TradingStrategyFactory:
         '13': AutoCreditBuyingStrategy,
         '16': AutoAfterMarketNXTTradingStrategy,
         '17': AutoCreditAfterMarketStrategy,
+        '18': AutoCreditBeforeFinishMarketSellingStrategy,
         '22': AutoBothAfterMarketStrategy
     }
     
