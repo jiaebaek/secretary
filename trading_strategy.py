@@ -147,7 +147,8 @@ class TradingStrategy(ABC):
         logger.debug('>>>>>>>>>>> 미체결 매도 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            self.trading.cancel_not_done_sell_order(order)
+            logger.debug(f"미체결 주문 : {order['name']} / {order['order_num']}")
+            self.trading.cancel_not_done_sell_order(order['order_num'])
     
 
 class AutoBothSellingStrategy(TradingStrategy):
@@ -364,8 +365,10 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
     
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-        self.get_user_credit_stock()
-        self._sell_all_credit_stocks_finish_market()
+        while True:
+            self.get_user_credit_stock()
+            self._sell_all_credit_stocks()
+            logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
 
 
 class CancelOrderStrategy(TradingStrategy):
