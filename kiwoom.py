@@ -207,7 +207,8 @@ class Kiwoom(QAxWidget):
                 'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목코드")),
                 'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
                 'state': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "주문상태")),
-                'num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "미체결수량"))
+                'num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "미체결수량")),
+                'type': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "주문구분"))
             }
             self.ret_multi_data.append(data)
 

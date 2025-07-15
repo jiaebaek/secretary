@@ -45,9 +45,9 @@ BUY_NEW_STOCK = "신규종목매수"
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
 ORDER_SLEEP_INTERVAL = 0.4   # 주문 후 대기 시간
 
-ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, 'KRX취소': 3, 'KRX취소': 4,
+ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, 'KRX매수취소': 3, 'KRX매도취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
-             'NXT매수': 21, 'NXT매도': 22, 'NXT취소': 23, 'NXT정정': 25}
+             'NXT매수': 21, 'NXT매도': 22, 'NXT매수취소': 23, 'NXT매도취소': 24, 'NXT정정': 25}
 HOGATYPE = {'지정가': "00", '시장가': "03", '시간외단일가': "62"}
 HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 2000000: 1000}
 
@@ -936,11 +936,17 @@ class Trading:
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
-    def cancel_not_done_sell_order(self, origin_order_num):
-        logger.debug("### 미체결 주문 취소")
+    def cancel_not_done_sell_order(self, order):
+        logger.debug("### 미체결 현금주문 취소")
 
-        return self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'취소'], "0",
-                               0, 0, "0", origin_order_num)
+        return self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
+                               int(order['num']), 0, "00", order['order_num'])
+
+    def cancel_not_done_credit_sell_order(self, order):
+        logger.debug("### 미체결 신용주문 취소")
+
+        return self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
+                               int(order['num']), 0, "00", "33", "00000000", order['order_num'])
 
     def set_exchange(self):
         now = datetime.datetime.now()

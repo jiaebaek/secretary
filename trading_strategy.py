@@ -144,11 +144,20 @@ class TradingStrategy(ABC):
                 self.log_window.update_progress(completed_credit, total_credit_stocks)
 
     def _cancel_sell_order(self):
-        logger.debug('>>>>>>>>>>> 미체결 매도 주문 취소 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 미체결 현금매도 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            logger.debug(f"미체결 주문 : {order['name']} / {order['order_num']}")
-            self.trading.cancel_not_done_sell_order(order['order_num'])
+            if "현금" in order['type']:
+                logger.debug(f"미체결 주문 : {order['name']} / {order['order_num']}")
+                self.trading.cancel_not_done_sell_order(order)
+
+    def _cancel_credit_sell_order(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매도 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_sell()
+        for order in self.trading.not_done_sell:
+            if "신용" in order['type']:
+                logger.debug(f"미체결 신용매도주문 : {order['name']} / {order['order_num']}")
+                self.trading.cancel_not_done_credit_sell_order(order)
     
 
 class AutoBothSellingStrategy(TradingStrategy):
@@ -371,12 +380,19 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
             logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
 
 
-class CancelOrderStrategy(TradingStrategy):
-    """Strategy for menu '30': 미체결 주문 취소"""
+class CancelSellOrderStrategy(TradingStrategy):
+    """Strategy for menu '30': 미체결 현금매도주문 취소"""
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self._cancel_sell_order()
+
+class CancelCreditSellOrderStrategy(TradingStrategy):
+    """Strategy for menu '31': 미체결 신용매도주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_sell_order()
 
 
 class TradingStrategyFactory:
@@ -397,7 +413,8 @@ class TradingStrategyFactory:
         '17': AutoCreditAfterMarketStrategy,
         '18': AutoCreditBeforeFinishMarketSellingStrategy,
         '22': AutoBothAfterMarketStrategy,
-        '30': CancelOrderStrategy
+        '30': CancelSellOrderStrategy,
+        '31': CancelCreditSellOrderStrategy
     }
     
     @classmethod
