@@ -522,7 +522,7 @@ class Kiwoom(QAxWidget):
                     and isinstance(hogaType, str)
                     and isinstance(originOrderNo, str)):
             raise Exception()
-        logger.debug("{} {} {} {} {} {} {} {} {}".format(requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo))
+        logger.debug("{} {} {} {} {} {} {} {} {} {} {]".format(requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo))
         return_code = self.dynamicCall("SendOrderCredit(QString, QString, QString, int, QString, int, int, QString, QString, QString, QString)",
                                       [requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo])
 

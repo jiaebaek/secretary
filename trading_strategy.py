@@ -147,7 +147,7 @@ class TradingStrategy(ABC):
         logger.debug('>>>>>>>>>>> 미체결 현금매도 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            if "현금" in order['type']:
+            if "신용" not in order['type']:
                 logger.debug(f"미체결 주문 : {order['name']} / {order['order_num']}")
                 self.trading.cancel_not_done_sell_order(order)
 
