@@ -207,7 +207,8 @@ class Kiwoom(QAxWidget):
                 'code': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목코드")),
                 'name': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "종목명")),
                 'state': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "주문상태")),
-                'num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "미체결수량"))
+                'num': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "미체결수량")),
+                'type': '{}'.format(self._comm_get_data(trcode, "", rqname, i, "주문구분"))
             }
             self.ret_multi_data.append(data)
 
@@ -521,7 +522,7 @@ class Kiwoom(QAxWidget):
                     and isinstance(hogaType, str)
                     and isinstance(originOrderNo, str)):
             raise Exception()
-        logger.debug("{} {} {} {} {} {} {} {} {}".format(requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo))
+        logger.debug("{} {} {} {} {} {} {} {} {} {} {}".format(requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo))
         return_code = self.dynamicCall("SendOrderCredit(QString, QString, QString, int, QString, int, int, QString, QString, QString, QString)",
                                       [requestName, screenNo, accountNo, orderType, code, qty, price, hogaType, creditType, loanDate, originOrderNo])
 

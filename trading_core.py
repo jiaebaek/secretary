@@ -46,15 +46,11 @@ BUY_NEW_STOCK = "신규종목매수"
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
 ORDER_SLEEP_INTERVAL = 0.4  # 주문 후 대기 시간
 
-ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, '매수취소': 3, '매도취소': 4,
+ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, 'KRX매수취소': 3, 'KRX매도취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
-             'NXT매수': 21, 'NXT매도': 22, 'NXT취소': 23, 'NXT정정': 25}
+             'NXT매수': 21, 'NXT매도': 22, 'NXT매수취소': 23, 'NXT매도취소': 24, 'NXT정정': 25}
 HOGATYPE = {'지정가': "0", '시장가': "03", '시간외단일가': "62"}
 HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 2000000: 1000}
-
-# 주문 이력 저장용 리스트
-order_history = []
-
 
 class Trading:
     def __init__(self):
@@ -76,9 +72,11 @@ class Trading:
         self.sell_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_earning_rate = -8
         self.sell_earning_rate = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.sell_credit_hoga = [0, 0]
-        self.sell_credit_hoga_after_market = [0, 0]
+        self.sell_credit_earning_rate = [0, 0]
+        self.sell_credit_earning_rate_finish_market = [0, 0]
+        self.sell_credit_earninig_rate_after_market = [0, 0]
         self.sell_credit_stock_amount = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.sell_credit_stock_amount_finish_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.sell_credit_stock_amount_after_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_1_stock_earning_rate = -3
         self.max_amount = 10000000
@@ -183,13 +181,23 @@ class Trading:
             if not row[1]:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
-                self.sell_credit_hoga[0] = row[1]
+                self.sell_credit_earning_rate[0] = row[1]
             elif row[0] == SELL_EARNING_RATE_2:
-                self.sell_credit_hoga[1] = row[1]
+                self.sell_credit_earning_rate[1] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_1:
                 self.sell_credit_stock_amount[0] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_2:
                 self.sell_credit_stock_amount[1] = row[1]
+
+        cur.execute("select * from 신용장마감매도설정")
+        rows = cur.fetchall()
+        for row in rows:
+            if not row[1]:
+                continue
+            if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
+                self.sell_credit_earning_rate_finish_market[0] = row[1]
+            elif row[0] == SELL_STOCK_AMOUNT_1:
+                self.sell_credit_stock_amount_finish_market[0] = row[1]
 
         cur.execute("select * from 신용시간외매도설정")
         rows = cur.fetchall()
@@ -197,9 +205,9 @@ class Trading:
             if not row[1]:
                 continue
             if row[0] == SELL_EARNING_RATE_1:  # 호가 대신 수익률로 변경
-                self.sell_credit_hoga_after_market[0] = row[1]
+                self.sell_credit_earninig_rate_after_market[0] = row[1]
             elif row[0] == SELL_EARNING_RATE_2:
-                self.sell_credit_hoga_after_market[1] = row[1]
+                self.sell_credit_earninig_rate_after_market[1] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_1:
                 self.sell_credit_stock_amount_after_market[0] = row[1]
             elif row[0] == SELL_STOCK_AMOUNT_2:
@@ -401,7 +409,6 @@ class Trading:
                                                   tr_type=HOGATYPE['지정가'])
         logger.debug(f"------- 현재가로 매수!! 종목명 : {name} 추가매수가 : {price}원 수량 : {num}개 매입금액 : {num * price}원")
         if result is True:
-            order_history.append({'종목명': name, '주문유형': '매수', '가격': price, '수량': num})
             return True
         else:
             _, msg = result
@@ -435,7 +442,6 @@ class Trading:
                                                   tr_type=HOGATYPE['지정가'])
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock_code, '주문유형': '매수', '가격': price, '수량': num})
             return True
         else:
             _, msg = result
@@ -469,7 +475,6 @@ class Trading:
                                                     tr_type=HOGATYPE['지정가'])
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock_code, '주문유형': '매수', '가격': price, '수량': num})
             return True
         else:
             _, msg = result
@@ -496,7 +501,6 @@ class Trading:
                                                    tr_type=HOGATYPE['지정가'])
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': name, '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -531,7 +535,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -556,7 +559,6 @@ class Trading:
                                                    tr_type=HOGATYPE['지정가'])
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': name, '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -589,7 +591,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -622,7 +623,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -650,7 +650,6 @@ class Trading:
                                                    tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -687,7 +686,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 신용 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -720,7 +718,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -758,7 +755,6 @@ class Trading:
                                                        tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
         if result is True:
-            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
         else:
             _, msg = result
@@ -913,6 +909,18 @@ class Trading:
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
+    def cancel_not_done_sell_order(self, order):
+        logger.debug("### 미체결 현금주문 취소")
+
+        return self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
+                               int(order['num']), 0, "00", order['order_num'])
+
+    def cancel_not_done_credit_sell_order(self, order):
+        logger.debug("### 미체결 신용주문 취소")
+
+        return self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
+                               int(order['num']), 0, "00", "33", "00000000", order['order_num'])
+
     def set_exchange(self):
         now = datetime.datetime.now()
         now_tupule = now.timetuple()
@@ -932,16 +940,5 @@ class Trading:
         code = stock_code[1:] if stock_code.startswith('A') else stock_code
         return code in self.nxt_list
 
-
-# 주문 이력 엑셀 저장 함수
-import csv
-
-def export_order_history_to_excel(filename='order_history.csv'):
-    if not order_history:
-        return
-    with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['종목명', '주문유형', '가격', '수량'])
-        writer.writeheader()
-        writer.writerows(order_history)
 
 

@@ -2,6 +2,7 @@ from time import sleep
 import sys
 import logging
 
+from config import LOGO_PATH
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
@@ -21,7 +22,10 @@ menu = {
     '13': "장중-신용-신규매수",
     '16': "시간외NXT-신용현금-매도",
     '17': "시간외-신용-매도",
-    '22': "시간외-신용현금-매도"
+    '22': "시간외-신용현금-매도",
+    '18': "장마감-신용-매도",
+    '30': "미체결-현금매도-주문-취소",
+    '31': "미체결-신용매도-주문-취소"
 }
 
 def setup_logging(menu_name, test=False):
@@ -42,40 +46,6 @@ def setup_logging(menu_name, test=False):
     logger.addHandler(fileHandler)
     logger.addHandler(streamHandler)
 
-def check_trading_time(trading_time, weekday, is_test=False):
-    if is_test:
-        return
-    if trading_time == 'normal':
-        if weekday in range(0, 5):
-            now = datetime.datetime.now()
-            now_tupule = now.timetuple()
-            logger.debug(now_tupule)
-            while now_tupule.tm_hour < 8:
-                sleep(60)
-                now = datetime.datetime.now()
-                now_tupule = now.timetuple()
-                logger.debug(now_tupule)
-            if now_tupule.tm_hour > 17:
-                logger.debug("장이 마감되었습니다.")
-                exit(0)
-        else:
-            exit(0)
-    elif trading_time == 'after_market':
-        if weekday in range(0, 5):
-            now = datetime.datetime.now()
-            now_tupule = now.timetuple()
-            logger.debug(now_tupule)
-            while now_tupule.tm_hour < 16:
-                sleep(60)
-                now = datetime.datetime.now()
-                now_tupule = now.timetuple()
-                logger.debug(now_tupule)
-            if now_tupule.tm_hour > 18:
-                logger.debug("시간외 장이 마감되었습니다.")
-                exit(0)
-        else:
-            exit(0)
-
 if __name__ == "__main__":
     # Parse command line arguments
     menu_code = sys.argv[1]
@@ -84,11 +54,6 @@ if __name__ == "__main__":
     is_test = True if trading_time == 'test' else False
 
     setup_logging(menu_name, is_test)
-
-    # Check if it's trading hours
-    weekday = datetime.datetime.today().weekday()
-    logger.debug(weekday)
-    check_trading_time(trading_time, weekday)
 
     logger.debug('거래 시작')
 
