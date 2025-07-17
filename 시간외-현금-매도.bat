@@ -1,1 +1,1 @@
-C:\Users\user1\anaconda3\envs\secretary\python.exe D:\PycharmProjects\secretary_v2\main.py 7 normal
+cmd /k "C:\Users\user1\anaconda3\envs\secretary\python.exe D:\PycharmProjects\secretary_v2_rest\main.py 7 normal"

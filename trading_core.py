@@ -528,7 +528,7 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'])
         else:
             result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -584,7 +584,7 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'])
         else:
             result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -616,7 +616,7 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'])
         else:
             result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -679,7 +679,7 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
             result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -711,7 +711,7 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:  # 시간외 단일가
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
             result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -748,7 +748,7 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:  # 시간외 단일가
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
                                                        tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
             result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
@@ -912,14 +912,24 @@ class Trading:
     def cancel_not_done_sell_order(self, order):
         logger.debug("### 미체결 현금주문 취소")
 
-        return self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
-                               int(order['num']), 0, "00", order['order_num'])
+        # REST API 방식으로 주문 취소
+        return self.kiwoom.cancel_order(
+            orig_order_no=order['order_num'],
+            stock_code=order['code'],
+            quantity=int(order['num']),
+            market=self.exchange
+        )
 
     def cancel_not_done_credit_sell_order(self, order):
         logger.debug("### 미체결 신용주문 취소")
 
-        return self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도취소'], order['code'],
-                               int(order['num']), 0, "00", "33", "00000000", order['order_num'])
+        # REST API 방식으로 신용 주문 취소
+        return self.kiwoom.cancel_credit_order(
+            orig_order_no=order['order_num'],
+            stock_code=order['code'],
+            quantity=int(order['num']),
+            market=self.exchange
+        )
 
     def set_exchange(self):
         now = datetime.datetime.now()

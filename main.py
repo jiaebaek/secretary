@@ -1,8 +1,6 @@
-from time import sleep
 import sys
 import logging
 
-from config import LOGO_PATH
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime

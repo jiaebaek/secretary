@@ -1,1 +1,0 @@
-C:\Users\user1\anaconda3\envs\secretary\python.exe D:\PycharmProjects\secretary_v2\main.py 3 test
