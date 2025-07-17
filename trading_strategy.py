@@ -47,7 +47,7 @@ class TradingStrategy(ABC):
         total_stocks = len(self.user_stock_list)
         completed = 0
         for stock in self.user_stock_list:
-            if self.trading.exchange == 'NXT' and stock['code'] not in self.trading.nxt_list:
+            if self.trading.exchange == 'NXT' and not self.trading.is_nxt_available(stock['code']):
                 continue
             remain = int(stock['available_num'])
             for i in range(len(self.trading.sell_earning_rate)):
@@ -67,7 +67,7 @@ class TradingStrategy(ABC):
         total_stocks = len(self.user_credit_stock_list)
         completed = 0
         for stock in self.user_credit_stock_list:
-            if self.trading.exchange == 'NXT' and stock['code'] not in self.trading.nxt_list:
+            if self.trading.exchange == 'NXT' and not self.trading.is_nxt_available(stock['code']):
                 continue
             remain = int(stock['possession_num'])
             for i in range(len(self.trading.sell_credit_hoga)):

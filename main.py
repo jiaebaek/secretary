@@ -1,14 +1,11 @@
 from time import sleep
 import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIcon
+import logging
 
-from config import LOGO_PATH
 from logger import LOG_FILE, logger
 import logging.handlers
 import datetime
 from trading_strategy import TradingStrategyFactory
-from log_viewer import LogWindow
 
 
 menu = {
@@ -37,9 +34,13 @@ def setup_logging(menu_name, test=False):
         fileHandler = logging.FileHandler(test_log_filename)
     else:
         fileHandler = logging.FileHandler(log_filename)
-    
+    streamHandler = logging.StreamHandler()
+
     fileHandler.setFormatter(formatter)
+    streamHandler.setFormatter(formatter)
+
     logger.addHandler(fileHandler)
+    logger.addHandler(streamHandler)
 
 def check_trading_time(trading_time, weekday, is_test=False):
     if is_test:
@@ -80,52 +81,34 @@ if __name__ == "__main__":
     menu_code = sys.argv[1]
     trading_time = sys.argv[2]  # normal or after_market or test
     menu_name = menu[menu_code]
-    
     is_test = True if trading_time == 'test' else False
-    
-    # Initialize PyQt application
-    app = QApplication(sys.argv)
-    
-    # Create and show log window
-    log_window = LogWindow()
-    log_window.setWindowIcon(QIcon(LOGO_PATH))  # Set window icon
-    log_window.show()
-    log_window.update_status(f"Running: {menu_name}")
-    
-    # Setup logging
+
     setup_logging(menu_name, is_test)
-    
+
     # Check if it's trading hours
     weekday = datetime.datetime.today().weekday()
     logger.debug(weekday)
     check_trading_time(trading_time, weekday)
-    
+
     logger.debug('거래 시작')
-    
+
     try:
         # Create appropriate trading strategy
         strategy = TradingStrategyFactory.create_strategy(menu_code)
-        
         # Create config dictionary based on command line arguments
         config = {
             'trading_time': trading_time,
-            'log_window': log_window  # Pass log window to strategy for progress updates
         }
-        
         # Add manual trading parameters if needed
         if menu_code in ['4', '5']:
             config['earning_rate'] = sys.argv[3].strip('%')
             config['num'] = sys.argv[4].strip('ea')
-        
         # Execute trading strategy
         strategy.execute(config)
-        log_window.update_status("Trading completed")
+        logger.info("Trading completed")
     except Exception as err:
         logger.exception(err)
-        log_window.update_status("Error occurred")
-    
+        logger.info("Error occurred")
+
     logger.debug("완료!")
-    
-    # Start the event loop
-    sys.exit(app.exec_())
 

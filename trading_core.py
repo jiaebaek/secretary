@@ -1,10 +1,11 @@
-from config import DB_PATH
-from kiwoom import Kiwoom
+from config import DB_PATH, KIWOOM_APPKEY, KIWOOM_APPSECRET
+from kiwoom_rest import KiwoomREST
 from logger import logger
 import sqlite3
 from time import sleep
 import random
 import datetime
+from nxt_stock_list import NXT_STOCK_LIST
 
 # Constants moved from main.py
 ORDER_INTERVAL = "주문간격(초)"
@@ -43,18 +44,21 @@ BUY_NEW_STOCK = "신규종목매수"
 
 # Sleep intervals
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
-ORDER_SLEEP_INTERVAL = 0.4   # 주문 후 대기 시간
+ORDER_SLEEP_INTERVAL = 0.4  # 주문 후 대기 시간
 
 ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, '매수취소': 3, '매도취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
              'NXT매수': 21, 'NXT매도': 22, 'NXT취소': 23, 'NXT정정': 25}
-HOGATYPE = {'지정가': "00", '시장가': "03", '시간외단일가': "62"}
+HOGATYPE = {'지정가': "0", '시장가': "03", '시간외단일가': "62"}
 HOGAUNIT = {2000: 1, 5000: 5, 20000: 10, 50000: 50, 200000: 100, 500000: 500, 2000000: 1000}
+
+# 주문 이력 저장용 리스트
+order_history = []
+
 
 class Trading:
     def __init__(self):
-        self.kiwoom = Kiwoom()
-        self.kiwoom.comm_connect()  # log in
+        self.kiwoom = KiwoomREST(KIWOOM_APPKEY, KIWOOM_APPSECRET)
         self.user_stock_num = 0
         self.user_stock_list = []
         self.interesting_stocks = []
@@ -85,7 +89,7 @@ class Trading:
         self.except_rebuy_list = []
         self.new_buy_stock = True
         self.exchange = "KRX"
-        self.nxt_list = []
+        self.nxt_list = NXT_STOCK_LIST
 
     def update_options(self):
         conn = sqlite3.connect(DB_PATH)
@@ -172,7 +176,7 @@ class Trading:
                 self.buy_new_credit_stock_num = row[1]
             elif row[0] == BUY_NEW_STOCK_AMOUNT:
                 self.buy_new_credit_stock_amount = row[1]
-                
+
         cur.execute("select * from 신용매도설정")
         rows = cur.fetchall()
         for row in rows:
@@ -206,7 +210,7 @@ class Trading:
         for row in rows:
             if not row[1]:
                 break
-            self.remain_money_buy_new_stock_down_rate[row[1]] = row[2] # must be one
+            self.remain_money_buy_new_stock_down_rate[row[1]] = row[2]  # must be one
 
         cur.execute("select * from secretary_stockuprate")
         rows = cur.fetchall()
@@ -219,108 +223,48 @@ class Trading:
         conn.close()
 
     def get_user_stock(self, after_market=False):
-        # 사용자 계정의 보유 주식 개수 확인
-        if after_market:
-            exchange = "KRX"
-        else:
-            exchange = self.exchange
-
-        self.account = self.kiwoom.get_login_info()
-        self.account = self.account.split(';')[0]
-        logger.debug('계좌번호 : {}'.format(self.account))
-
-        self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("조회구분", "1")
-        self.kiwoom.set_input_value("거래소구분", exchange)
-        self.kiwoom.comm_rq_data("잔고조회", "opw00018", 0, "0101")
-        self.user_stock_num = self.kiwoom.ret_cnt
-        self.user_stock_list = self.kiwoom.ret_multi_data
-
-        while self.kiwoom.remained_data:
-            logger.debug("다음 잔고조회")
-            sleep(TR_REQ_TIME_INTERVAL)
-            self.kiwoom.set_input_value("계좌번호", self.account)
-            self.kiwoom.set_input_value("조회구분", "1")
-            self.kiwoom.set_input_value("거래소구분", exchange)
-            self.kiwoom.comm_rq_data("잔고조회", "opw00018", 2, "0101")
-            self.user_stock_num += self.kiwoom.ret_cnt
-            self.user_stock_list.extend(self.kiwoom.ret_multi_data)
-
-        logger.debug('user stock cnt : {}'.format(self.user_stock_num))
+        # 잔고조회 (REST)
+        market = "KRX" if after_market else self.exchange
+        result = self.kiwoom.get_balance(qry_tp='1', dmst_stex_tp=market)
+        self.user_stock_list = result.get('acnt_evlt_remn_indv_tot', [])
+        self.user_stock_num = len(self.user_stock_list)
+        logger.debug(f'user stock cnt : {self.user_stock_num}')
         logger.debug(self.user_stock_list)
         return self.user_stock_list
 
     def get_user_credit_stock(self, after_market=False):
-        if after_market:
-            exchange = "KRX"
-        else:
-            exchange = self.exchange
-
-        # 사용자 계정의 보유 신용 주식 개수 확인
-        self.account = self.kiwoom.get_login_info()
-        self.account = self.account.split(';')[0]
-        logger.debug('계좌번호 : {}'.format(self.account))
-
-        self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("상장폐지조회구분", "1")
-        self.kiwoom.set_input_value("거래소구분", exchange)
-        self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
-        self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
-        self.user_credit_stock_num = self.kiwoom.ret_cnt
-        self.user_credit_stock_list = self.kiwoom.ret_multi_data
-
-        while self.kiwoom.remained_data:
-            logger.debug("다음 잔고조회")
-            sleep(TR_REQ_TIME_INTERVAL)
-            self.kiwoom.set_input_value("계좌번호", self.account)
-            self.kiwoom.set_input_value("상장폐지조회구분", "1")
-            self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
-            self.kiwoom.set_input_value("거래소구분", exchange)
-            self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 2, "0101")
-            self.user_credit_stock_num += self.kiwoom.ret_cnt
-            self.user_credit_stock_list.extend(self.kiwoom.ret_multi_data)
-
-        logger.debug('user stock cnt : {}'.format(self.user_credit_stock_num))
+        # 신용잔고조회 (REST)
+        market = "KRX" if after_market else self.exchange
+        result = self.kiwoom.get_account_evaluation(qry_tp='0', dmst_stex_tp=market)
+        self.user_credit_stock_list = result.get('stk_acnt_evlt_prst', [])
+        self.user_credit_stock_num = len(self.user_credit_stock_list)
+        logger.debug(f'user credit stock cnt : {self.user_credit_stock_num}')
         logger.debug(self.user_credit_stock_list)
         return self.user_credit_stock_list
 
     def get_user_remain(self, after_market=False):
-        if after_market:
-            exchange = "KRX"
-        else:
-            exchange = self.exchange
-        # 예수금 조회
-        self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("상장폐지조회구분", "1")
-        self.kiwoom.set_input_value("비밀번호입력매체구분", "00")
-        self.kiwoom.set_input_value("거래소구분", exchange)
-        self.kiwoom.comm_rq_data("계좌평가현황요청", "opw00004", 0, "0101")
-        logger.debug('예수금 조회 : {}'.format(self.kiwoom.ret_data))
-        sleep(TR_REQ_TIME_INTERVAL)
-        return int(self.kiwoom.ret_data['remain'])
+        # 예수금 조회 (REST)
+        market = "KRX" if after_market else self.exchange
+        result = self.kiwoom.get_account_evaluation(qry_tp='0', dmst_stex_tp=market)
+        remain = int(result.get('entr', 0))
+        logger.debug(f'예수금 조회 : {remain}')
+        return remain  # 예수금(REST 응답 필드)
 
     def get_interesting_stock(self):
-        self.kiwoom.get_condition_load()
-        sleep(TR_REQ_TIME_INTERVAL)
-        if self.kiwoom.condition:
-            for key in self.kiwoom.condition.keys():
-                self.kiwoom.send_condition("0101", self.kiwoom.condition[key], key, 0)
-                self.interesting_stocks.extend(self.kiwoom.code_list)
-                logger.debug("관심종목 : {}".format(self.interesting_stocks))
-                sleep(TR_REQ_TIME_INTERVAL)
-            '''[04056, 34567, 12233, ...]'''
-        stocks_set = set(self.interesting_stocks)
-        self.interesting_stocks = list(stocks_set)
-        logger.debug(len(self.interesting_stocks))
+        # 관심종목 조회 (REST)
+        result = self.kiwoom.get_interesting_stocks()
+        self.interesting_stocks = [item['stk_cd'] for item in result.get('atn_stk_infr', [])]
+        logger.debug(f'관심종목 : {self.interesting_stocks}')
+        # TODO: 조건검색 후 관심종목 추가
 
     def get_current_price(self, code):
+        # 현재가 조회 (REST)
         if self.exchange == 'NXT':
             code += '_NX'
-        self.kiwoom.set_input_value("종목코드", code)
-        self.kiwoom.comm_rq_data("주식기본정보", "opt10001", 0, "0101")
-        logger.debug('현재가 조회 : {}'.format(self.kiwoom.ret_data))
-        sleep(TR_REQ_TIME_INTERVAL)
-        return int(self.kiwoom.ret_data['current_price']), self.kiwoom.ret_data['name']
+        result = self.kiwoom.get_stock_price(code)
+        price = int(float(result.get('cur_prc', 0)))  # 'cur_prc'가 현재가 필드명
+        name = result.get('stk_nm', '')  # 종목명 필드명
+        return price, name
 
     def is_stock_in_user_stock(self, code):
         for i, _ in enumerate(self.user_stock_list):
@@ -347,34 +291,20 @@ class Trading:
         return False
 
     def get_not_done_order(self):  # 미체결 매수
-        if self.exchange == "NXT":
-            exchange = 2
-        else:
-            exchange = 1
-        self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("체결구분", 1)
-        self.kiwoom.set_input_value("매매구분", 2)
-        self.kiwoom.set_input_value("거래소구분", exchange)
-        self.kiwoom.comm_rq_data("실시간체결", "opt10075", 0, "0101")
-        self.not_done_orders_num = self.kiwoom.ret_cnt
-        self.not_done_orders = self.kiwoom.ret_multi_data
-        logger.debug("미체결 매수주문: {}".format(self.not_done_orders))
-        sleep(TR_REQ_TIME_INTERVAL)
+        # REST 미체결 주문 조회
+        result = self.kiwoom.get_unfilled_orders('', all_stk_tp='0', tr_type='2',
+                                                 stex_tp='1' if self.exchange == 'KRX' else '2')
+        self.not_done_orders = result.get('oso', [])
+        self.not_done_orders_num = len(self.not_done_orders)
+        logger.debug(f"미체결 매수주문: {self.not_done_orders}")
 
     def get_not_done_sell(self):  # 미체결 매도
-        if self.exchange == "NXT":
-            exchange = 2
-        else:
-            exchange = 1
-        self.kiwoom.set_input_value("계좌번호", self.account)
-        self.kiwoom.set_input_value("체결구분", 1)
-        self.kiwoom.set_input_value("매매구분", 1)
-        self.kiwoom.set_input_value("거래소구분", exchange)
-        self.kiwoom.comm_rq_data("실시간체결", "opt10075", 0, "0101")
-        self.not_done_sell_num = self.kiwoom.ret_cnt
-        self.not_done_sell = self.kiwoom.ret_multi_data
-        logger.debug("미체결 매도주문: {}".format(self.not_done_sell))
-        sleep(TR_REQ_TIME_INTERVAL)
+        # REST 미체결 주문 조회
+        result = self.kiwoom.get_unfilled_orders('', all_stk_tp='0', tr_type='1',
+                                                 stex_tp='1' if self.exchange == 'KRX' else '2')
+        self.not_done_sell = result.get('oso', [])
+        self.not_done_sell_num = len(self.not_done_sell)
+        logger.debug(f"미체결 매도주문: {self.not_done_sell}")
 
     def disconnect_real_data(self):
         self.kiwoom.disconnect_real_data("0101")
@@ -412,7 +342,7 @@ class Trading:
                     break
                 # 해당 종목이 이미 보유중인지 확인
                 if self.is_stock_in_user_stock(self.interesting_stocks[key]) \
-                        or self.is_stock_in_not_done_order(self.interesting_stocks[key])\
+                        or self.is_stock_in_not_done_order(self.interesting_stocks[key]) \
                         or key in bought_key:
                     logger.debug('이미 보유하고 있거나 신규매수한 종목입니다. skip!! [{}]'.format(self.interesting_stocks[key]))
                     continue
@@ -424,7 +354,6 @@ class Trading:
                 if self._buy_designated_price(self.interesting_stocks[key], self.buy_new_stock_amount, -1, price):
                     buy_cnt += 1
                 logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-                sleep(ORDER_SLEEP_INTERVAL)
         else:
             logger.debug('보유주식이 {}개이므로 더이상 신규매수할수 없습니다.'.format(self.user_stock_num))
 
@@ -443,8 +372,8 @@ class Trading:
                 break
             # 해당 종목이 이미 보유중인지 확인
             if self.is_stock_in_user_credit_stock(self.interesting_stocks[key]) \
-                or self.is_stock_in_user_stock(self.interesting_stocks[key]) \
-                or key in bought_key:
+                    or self.is_stock_in_user_stock(self.interesting_stocks[key]) \
+                    or key in bought_key:
                 logger.debug('이미 보유하고 있거나 신규매수한 종목입니다. skip!! [{}]'.format(self.interesting_stocks[key]))
                 continue
             bought_key.append(key)
@@ -452,54 +381,32 @@ class Trading:
             price, name = self.get_current_price(self.interesting_stocks[key])
             logger.debug("현재가 정보 요청 완료")
             # -1프로로 매수 예약
-            if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -0.1, price):
+            if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -0.1,
+                                                 price):
                 buy_cnt += 1
             logger.debug('보유주식개수(주문내역포함):{}'.format(buy_cnt + self.user_stock_num))
-            sleep(ORDER_SLEEP_INTERVAL)
 
     def _buy_current_price(self, stock_code, amount, buy_amount=None):
-        # 일정 금액(amount)만큼 현재가로 매수
         if 'J' in stock_code:
             return
-
-        logger.debug(" - 현재가 정보 요청")
         price, name = self.get_current_price(stock_code)
-        if amount == 0:
-            num = 1
+        num = int(amount / price) if amount else 1
+        if buy_amount and (buy_amount + (num * price) > self.max_amount):
+            num = int((self.max_amount - buy_amount) / price)
+        if num == 0:
+            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
+            return False
+        # REST 매수 주문
+        result = self.kiwoom.place_cash_buy_order(stock_code, num, price=price, market=self.exchange,
+                                                  tr_type=HOGATYPE['지정가'])
+        logger.debug(f"------- 현재가로 매수!! 종목명 : {name} 추가매수가 : {price}원 수량 : {num}개 매입금액 : {num * price}원")
+        if result is True:
+            order_history.append({'종목명': name, '주문유형': '매수', '가격': price, '수량': num})
+            return True
         else:
-            num = int(amount / price)
-        if buy_amount:
-            if buy_amount + (num * price) > self.max_amount:
-                num = int((self.max_amount - buy_amount) / price)
-        if num == 0:
-            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
+            _, msg = result
+            logger.error(f"매수 주문 실패: {msg}")
             return False
-
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
-        logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
-        return True
-
-    def _buy_current_price_num(self, stock_code, num, buy_amount=None):
-        # 일정 금액(amount)만큼 현재가로 매수
-        if 'J' in stock_code:
-            return
-
-        logger.debug(" - 현재가 정보 요청")
-        price, name = self.get_current_price(stock_code)
-        if buy_amount:
-            if buy_amount + (num * price) > self.max_amount:
-                num = int((self.max_amount - buy_amount) / price)
-        if num == 0:
-            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
-            return False
-
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
-        logger.debug("------- 현재가로 매수!! 종목명 : {} 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(name,  price, num, num * price))
-        return True
 
     def _buy_designated_price(self, stock_code, amount, earning_rate, base_price, buy_amount=None):
         # 수익률(earning_rate) 지정가로 예약 매수
@@ -524,11 +431,16 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
 
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+        result = self.kiwoom.place_cash_buy_order(stock_code, num, price=price, market=self.exchange,
+                                                  tr_type=HOGATYPE['지정가'])
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
-        return True
+        if result is True:
+            order_history.append({'종목명': stock_code, '주문유형': '매수', '가격': price, '수량': num})
+            return True
+        else:
+            _, msg = result
+            logger.error(f"지정가 매수 주문 실패: {msg}")
+            return False
 
     def _buy_credit_designated_price(self, stock_code, amount, earning_rate, base_price, buy_amount=None):
         # 수익률(earning_rate) 지정가로 예약 매수
@@ -553,11 +465,16 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
 
-        self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매수'], stock_code,
-                               num, price, HOGATYPE['지정가'], "03", "", "")
-        sleep(ORDER_SLEEP_INTERVAL)
+        result = self.kiwoom.place_credit_buy_order(stock_code, num, price=price, market=self.exchange,
+                                                    tr_type=HOGATYPE['지정가'])
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
-        return True
+        if result is True:
+            order_history.append({'종목명': stock_code, '주문유형': '매수', '가격': price, '수량': num})
+            return True
+        else:
+            _, msg = result
+            logger.error(f"신용 지정가 매수 주문 실패: {msg}")
+            return False
 
     def _sell_current_price(self, stock, remain, sell_stock_amount):
         # 매도#
@@ -575,11 +492,16 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                   tr_type=HOGATYPE['지정가'])
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': name, '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_designated_price(self, stock, sell_earning_rate, remain, sell_stock_amount, after_market):
         if 'J' in stock['code']:
@@ -602,14 +524,19 @@ class Trading:
             return remain - num
 
         if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                   num, price, HOGATYPE['시간외단일가'], "")
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'])
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                   num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_1_stock_current_price(self, stock, remain):
         # 매도#
@@ -625,39 +552,16 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                   tr_type=HOGATYPE['지정가'])
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
-
-    def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain, after_market):
-        if 'J' in stock['code']:
-            return
-
-        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
-        for pr, un in HOGAUNIT.items():
-            if price < pr:
-                unit = un
-                break
-        price = int(price / unit) + 1 # 올림
-        price = int(price * unit)
-        num = 1
-        if num > remain:
-            num = remain
-        if num == 0:
-            logger.debug("매도 가능 수량 : 0")
+        if result is True:
+            order_history.append({'종목명': name, '주문유형': '매도', '가격': price, '수량': num})
             return remain - num
-
-        if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                   num, price, HOGATYPE['시간외단일가'], "")
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                   num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
-        logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_2_stock_designated_price(self, stock, sell_earning_rate, remain, after_market):
         if 'J' in stock['code']:
@@ -678,14 +582,52 @@ class Trading:
             return remain - num
 
         if after_market:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                   num, price, HOGATYPE['시간외단일가'], "")
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'])
         else:
-            self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                   num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
+
+    def _sell_1_stock_designated_price(self, stock, sell_earning_rate, remain, after_market):
+        if 'J' in stock['code']:
+            return
+
+        price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.5) / 100))
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit) + 1  # 올림
+        price = int(price * unit)
+        num = 1
+        if num > remain:
+            num = remain
+        if num == 0:
+            logger.debug("매도 가능 수량 : 0")
+            return remain - num
+
+        if after_market:
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'])
+        else:
+            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'])
+        logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_designated_price_num(self, stock, sell_earning_rate, remain, num):
         if 'J' in stock['code']:
@@ -704,17 +646,23 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        self.kiwoom.send_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                               num, price, HOGATYPE['지정가'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                   tr_type=HOGATYPE['지정가'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_credit_designated_price(self, stock, sell_earning_rate, remain, sell_stock_amount, after_market):
         if 'J' in stock['code']:
             return
 
-        interest = float(stock['interest']) / int(stock['possession_num'])
+        interest = float(stock['interest']) / int(
+            stock['possession_num']) if 'interest' in stock and 'possession_num' in stock else 0
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.3 = 수수료
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -732,20 +680,26 @@ class Trading:
             return remain - num
 
         if after_market:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                        num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                          num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 신용 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def _sell_credit_designated_price_num(self, stock, sell_earning_rate, remain, num, after_market):
         if 'J' in stock['code']:
             return
 
-        interest = float(stock['interest']) / int(stock['possession_num'])
+        interest = float(stock['interest']) / int(
+            stock['possession_num']) if 'interest' in stock and 'possession_num' in stock else 0
         price = int(stock['buy_price']) * (1 + ((sell_earning_rate + 0.3) / 100)) + interest  # 0.3 = 수수료
         for pr, un in HOGAUNIT.items():
             if price < pr:
@@ -758,21 +712,27 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        if after_market: # 시간외 단일가
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                        num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+        if after_market:  # 시간외 단일가
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                          num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
-    
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
+
     def _sell_credit_hoga_num(self, stock, hoga, remain, num, after_market):
         if 'J' in stock['code']:
             return
 
-        interest = float(stock['interest']) / int(stock['possession_num'])
+        interest = float(stock['interest']) / int(
+            stock['possession_num']) if 'interest' in stock and 'possession_num' in stock else 0
         price = int(stock['buy_price']) * (1 + (0.3 / 100)) + interest  # 0.5 = 수수료
         price = int(price)
         for pr, un in HOGAUNIT.items():
@@ -790,21 +750,29 @@ class Trading:
         if num == 0:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
-        if after_market: # 시간외 단일가
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE['KRX매도'], stock['code'],
-                                        num, price, HOGATYPE['시간외단일가'], "33", stock['loan_date'], "")
+        if after_market:  # 시간외 단일가
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
         else:
-            self.kiwoom.send_credit_order("수동주문", "0101", self.account, ORDERTYPE[self.exchange+'매도'], stock['code'],
-                                          num, price, HOGATYPE['지정가'], "33", stock['loan_date'], "")
-        sleep(ORDER_SLEEP_INTERVAL)
+            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
+                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        return remain - num
+        if result is True:
+            order_history.append({'종목명': stock['name'], '주문유형': '매도', '가격': price, '수량': num})
+            return remain - num
+        else:
+            _, msg = result
+            logger.error(f"매도 주문 실패: {msg}")
+            return remain
 
     def rebuy_user_stock(self, stock):
         # 물타기 매수#
 
-        logger.debug("### 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_earning_rate, stock['name'], stock['earning_rate'], int(stock['buy_price']),
-                                                                               int(stock['buy_amount'])))
+        logger.debug("### 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(self.rebuy_earning_rate,
+                                                                                            stock['name'],
+                                                                                            stock['earning_rate'],
+                                                                                            int(stock['buy_price']),
+                                                                                            int(stock['buy_amount'])))
 
         if float(stock["earning_rate"]) <= self.rebuy_earning_rate:
             self._buy_current_price(stock['code'], self.rebuy_stock_amount, int(stock['buy_amount']))
@@ -819,13 +787,17 @@ class Trading:
                                                                                       int(stock['buy_price']),
                                                                                       int(stock['buy_amount'])))
 
-        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'], int(stock['buy_amount']))
+        self._buy_designated_price(stock['code'], 0, self.rebuy_1_stock_earning_rate, stock['buy_price'],
+                                   int(stock['buy_amount']))
 
     def rebuy_manual_stock(self, stock, earning_rate, buy_stock_num):
         # 물타기 매수#
 
-        logger.debug("### 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(float(earning_rate), stock['name'], stock['earning_rate'], int(stock['buy_price']),
-                                                                               int(stock['buy_amount'])))
+        logger.debug(
+            "### 매수 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원###".format(float(earning_rate), stock['name'],
+                                                                                   stock['earning_rate'],
+                                                                                   int(stock['buy_price']),
+                                                                                   int(stock['buy_amount'])))
 
         if float(stock["earning_rate"]) <= float(earning_rate):
             self._buy_current_price_num(stock['code'], int(buy_stock_num), int(stock['buy_amount']))
@@ -834,23 +806,31 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                  stock['name'],
+                                                                                                  stock['earning_rate'],
+                                                                                                  int(stock[
+                                                                                                          'buy_price']),
+                                                                                                  int(stock[
+                                                                                                          'buy_amount']),
+                                                                                                  remain))
 
         return self._sell_designated_price(stock, sell_earning_rate, remain, sell_stock_amount, after_market)
-    
+
     def sell_user_credit_stock(self, stock, sell_earning_rate, remain, sell_stock_amount, after_market=False):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                  stock['name'],
+                                                                                                  stock['earning_rate'],
+                                                                                                  int(stock[
+                                                                                                          'buy_price']),
+                                                                                                  int(stock[
+                                                                                                          'buy_amount']),
+                                                                                                  remain))
 
         return self._sell_credit_designated_price(stock, sell_earning_rate, remain, sell_stock_amount, after_market)
 
@@ -858,11 +838,16 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 1주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                     stock['name'],
+                                                                                                     stock[
+                                                                                                         'earning_rate'],
+                                                                                                     int(stock[
+                                                                                                             'buy_price']),
+                                                                                                     int(stock[
+                                                                                                             'buy_amount']),
+                                                                                                     remain))
         return self._sell_1_stock_designated_price(stock, sell_earning_rate, remain, after_market)
 
     def sell_current_1_stock(self, stock, remain):
@@ -870,21 +855,29 @@ class Trading:
         # 지정 수익률 이상 가격으로 매도
 
         logger.debug("### 1주 현재가 매도 종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+                                                                                                        stock[
+                                                                                                            'earning_rate'],
+                                                                                                        int(stock[
+                                                                                                                'buy_price']),
+                                                                                                        int(stock[
+                                                                                                                'buy_amount']),
+                                                                                                        remain))
         return self._sell_1_stock_current_price(stock, remain)
 
     def sell_2_stock(self, stock, sell_earning_rate, remain, after_market=False):
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 2주 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                     stock['name'],
+                                                                                                     stock[
+                                                                                                         'earning_rate'],
+                                                                                                     int(stock[
+                                                                                                             'buy_price']),
+                                                                                                     int(stock[
+                                                                                                             'buy_amount']),
+                                                                                                     remain))
         return self._sell_2_stock_designated_price(stock, sell_earning_rate, remain, after_market)
 
     def sell_manual_credit_stock(self, stock, sell_earning_rate, remain, sell_stock_num, after_market=False):
@@ -895,8 +888,10 @@ class Trading:
             "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
                                                                                                   stock['name'],
                                                                                                   stock['earning_rate'],
-                                                                                                  int(stock['buy_price']),
-                                                                                                  int(stock['buy_amount']),
+                                                                                                  int(stock[
+                                                                                                          'buy_price']),
+                                                                                                  int(stock[
+                                                                                                          'buy_amount']),
                                                                                                   remain))
 
         return self._sell_credit_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num),
@@ -906,11 +901,15 @@ class Trading:
         # 매도#
         # 지정 수익률 이상 가격으로 매도
 
-        logger.debug("### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate, stock['name'],
-                                                                               stock['earning_rate'],
-                                                                               int(stock['buy_price']),
-                                                                                int(stock['buy_amount']),
-                                                                                remain))
+        logger.debug(
+            "### 매도 기준 : {}%  종목명 : {} 현재수익률 : {}% 매입가 : {}원 보유금액 : {}원 매도 가능 수량 : {}개###".format(sell_earning_rate,
+                                                                                                  stock['name'],
+                                                                                                  stock['earning_rate'],
+                                                                                                  int(stock[
+                                                                                                          'buy_price']),
+                                                                                                  int(stock[
+                                                                                                          'buy_amount']),
+                                                                                                  remain))
 
         return self._sell_designated_price_num(stock, int(sell_earning_rate), remain, int(sell_stock_num))
 
@@ -929,6 +928,20 @@ class Trading:
             self.exchange = "NXT"
         logger.debug(f"거래소 : {self.exchange}")
 
-        if self.exchange == "NXT":
-            self.nxt_list = self.kiwoom.get_code_list_by_market(self.exchange)
-            logger.debug(f"NXT 거래소 종목 리스트 : {self.nxt_list}")
+    def is_nxt_available(self, stock_code):
+        code = stock_code[1:] if stock_code.startswith('A') else stock_code
+        return code in self.nxt_list
+
+
+# 주문 이력 엑셀 저장 함수
+import csv
+
+def export_order_history_to_excel(filename='order_history.csv'):
+    if not order_history:
+        return
+    with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+        writer = csv.DictWriter(f, fieldnames=['종목명', '주문유형', '가격', '수량'])
+        writer.writeheader()
+        writer.writerows(order_history)
+
+
