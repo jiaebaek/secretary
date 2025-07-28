@@ -147,16 +147,15 @@ class TradingStrategy(ABC):
         logger.debug('>>>>>>>>>>> 미체결 현금매도 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            if "신용" not in order['type']:
-                logger.debug(f"미체결 주문 : {order['name']} / {order['order_num']}")
-                self.trading.cancel_not_done_sell_order(order)
+            logger.debug(f"미체결 주문 : {order['stk_nm']} / {order['orig_ord_no']}")
+            self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_credit_sell_order(self):
         logger.debug('>>>>>>>>>>> 미체결 신용매도 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['type']:
-                logger.debug(f"미체결 신용매도주문 : {order['name']} / {order['order_num']}")
+                logger.debug(f"미체결 신용매도주문 : {order['stk_nm']} / {order['orig_ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
     
 
@@ -394,6 +393,18 @@ class CancelCreditSellOrderStrategy(TradingStrategy):
         self.log_window = config.get('log_window')
         self._cancel_credit_sell_order()
 
+class GetUserStocks(TradingStrategy):
+
+    def execute(self, config: Dict[str, Any]) -> None:
+
+        self.get_user_stock()
+
+class GetUserCreditStocks(TradingStrategy):
+
+    def execute(self, config: Dict[str, Any]) -> None:
+
+        self.get_user_credit_stock()
+
 
 class TradingStrategyFactory:
     """Factory class to create appropriate trading strategy"""
@@ -414,7 +425,9 @@ class TradingStrategyFactory:
         '18': AutoCreditBeforeFinishMarketSellingStrategy,
         '22': AutoBothAfterMarketStrategy,
         '30': CancelSellOrderStrategy,
-        '31': CancelCreditSellOrderStrategy
+        '31': CancelCreditSellOrderStrategy,
+        '100': GetUserStocks,
+        '101': GetUserCreditStocks
     }
     
     @classmethod

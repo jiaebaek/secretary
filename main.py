@@ -1,77 +1,65 @@
-import sys
-import logging
-
-from logger import LOG_FILE, logger
-import logging.handlers
-import datetime
+import argparse
 from trading_strategy import TradingStrategyFactory
+from utils import load_strategy_name
+from strategy_definitions import STRATEGY_NAME_TO_CODE
+from config import LOG_FILE_PATH
+import logging
+from logger import logger
 
-
-menu = {
-    '0': "장중-신용현금-매도",
-    '1': "자동-물타기-매수",
-    '2': "장중-현금-매도",
-    '3': "장중-현금-신규-매수",
-    '4': "수동-매도",
-    '5': "수동-물타기-매수",
-    '7': "시간외-현금-매도",
-    '12': "장중-신용-매도",
-    '12-1': "장중-신용-매도-무한반복",
-    '13': "장중-신용-신규매수",
-    '16': "시간외NXT-신용현금-매도",
-    '17': "시간외-신용-매도",
-    '22': "시간외-신용현금-매도",
-    '18': "장마감-신용-매도",
-    '30': "미체결-현금매도-주문-취소",
-    '31': "미체결-신용매도-주문-취소"
-}
-
-def setup_logging(menu_name, test=False):
+def setup_logger_for_strategy(strategy_name):
+    import re
+    from datetime import datetime
+    import os
+    safe_strategy = re.sub(r'[\\/:*?"<>|]', '_', strategy_name)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file_path = os.path.join(LOG_FILE_PATH, f"{timestamp}_{safe_strategy}.log")
+    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
     formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
-    
-    test_log_filename = LOG_FILE+'{}_{}_test.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu_name)
-    log_filename = LOG_FILE + '{}_{}.txt'.format(datetime.datetime.now().strftime('%Y-%m-%d'), menu_name)
-    
-    if test:
-        fileHandler = logging.FileHandler(test_log_filename)
-    else:
-        fileHandler = logging.FileHandler(log_filename)
-    streamHandler = logging.StreamHandler()
+    file_handler.setFormatter(formatter)
+    logger.handlers = []  # 기존 핸들러 제거
+    logger.addHandler(file_handler)
+    # (선택) 콘솔 핸들러도 추가
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-    fileHandler.setFormatter(formatter)
-    streamHandler.setFormatter(formatter)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", type=str, help="전략 이름 (단일 실행용)")
+    parser.add_argument("--time", type=str, help="등록된 시간대 실행용")
+    args = parser.parse_args()
 
-    logger.addHandler(fileHandler)
-    logger.addHandler(streamHandler)
-
-if __name__ == "__main__":
-    # Parse command line arguments
-    menu_code = sys.argv[1]
-    trading_time = sys.argv[2]  # normal or after_market or test
-    menu_name = menu[menu_code]
-    is_test = True if trading_time == 'test' else False
-
-    setup_logging(menu_name, is_test)
-
-    logger.debug('거래 시작')
-
-    try:
-        # Create appropriate trading strategy
+    if args.name:
+        setup_logger_for_strategy(args.name)
+        menu_code = STRATEGY_NAME_TO_CODE.get(args.name)
         strategy = TradingStrategyFactory.create_strategy(menu_code)
-        # Create config dictionary based on command line arguments
-        config = {
-            'trading_time': trading_time,
-        }
-        # Add manual trading parameters if needed
-        if menu_code in ['4', '5']:
-            config['earning_rate'] = sys.argv[3].strip('%')
-            config['num'] = sys.argv[4].strip('ea')
-        # Execute trading strategy
-        strategy.execute(config)
-        logger.info("Trading completed")
-    except Exception as err:
-        logger.exception(err)
-        logger.info("Error occurred")
+        strategy.execute({})
+        return
 
-    logger.debug("완료!")
+    if args.time:
+        strategy_names = load_strategy_name(args.time)
+        if not strategy_names:
+            logger.error(f"[main.py] {args.time}에 등록된 전략이 없습니다.")
+            return
 
+        if isinstance(strategy_names, str):
+            strategy_names = [strategy_names]
+
+        for strategy_name in strategy_names:
+            setup_logger_for_strategy(strategy_name)
+            menu_code = STRATEGY_NAME_TO_CODE.get(strategy_name)
+            if not menu_code:
+                logger.warning(f"[main.py] 전략명 '{strategy_name}'에 해당하는 코드가 없습니다.")
+                continue
+            try:
+                strategy = TradingStrategyFactory.create_strategy(menu_code)
+                strategy.execute({'trading_time': args.time})
+                logger.info(f"[main.py] 전략 {strategy_name}({menu_code}) 실행 완료")
+            except Exception as e:
+                logger.exception(f"[main.py] 전략 {strategy_name} 실행 중 예외 발생: {e}")
+                continue
+
+if __name__ == '__main__':
+    main()
+    

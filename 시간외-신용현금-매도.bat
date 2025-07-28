@@ -1,1 +1,0 @@
-cmd /k "C:\Users\user1\anaconda3\envs\secretary\python.exe D:\PycharmProjects\secretary_v2_rest\main.py 22 normal"

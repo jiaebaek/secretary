@@ -1,7 +1,7 @@
 # System configurations
 KAKAOTALK_PATH = "C:\\PycharmProjects\\secretary\\카카오톡.lnk"  # Change this path according to your system
-LOG_FILE_PATH = "D:\\secretary_log\\"  # Change this path according to your system 
-DB_PATH = "D:\PycharmProjects/secretary_web/db.sqlite3"
+LOG_FILE_PATH = "C:\\Users\\deser\\Project\\secretary_logs\\"  # Change this path according to your system 
+DB_PATH = "C:\\Users\\deser\\Project\\secretary\\db.sqlite3"
 LOGO_PATH = "D:\PycharmProjects\secretary_v2\Trading_Secretary_Icon.ico"
 
 # Kiwoom OpenAPI+ REST 인증 정보

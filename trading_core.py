@@ -914,9 +914,9 @@ class Trading:
 
         # REST API 방식으로 주문 취소
         return self.kiwoom.cancel_order(
-            orig_order_no=order['order_num'],
-            stock_code=order['code'],
-            quantity=int(order['num']),
+            orig_order_no=order['orig_ord_no'],
+            stock_code=order['stk_cd'],
+            quantity=int(order['oso_qty']),
             market=self.exchange
         )
 
@@ -925,9 +925,9 @@ class Trading:
 
         # REST API 방식으로 신용 주문 취소
         return self.kiwoom.cancel_credit_order(
-            orig_order_no=order['order_num'],
-            stock_code=order['code'],
-            quantity=int(order['num']),
+            orig_order_no=order['orig_ord_no'],
+            stock_code=order['stk_cd'],
+            quantity=int(order['oso_qty']),
             market=self.exchange
         )
 
