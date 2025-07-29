@@ -5,9 +5,8 @@ import subprocess
 import time
 import re
 from strategy_definitions import STRATEGY_NAME_TO_CODE
-from config import LOG_FILE_PATH
-import threading
-from datetime import datetime, timedelta
+from config import LOG_FILE_PATH, ACCOUNT_OWNER_NAME
+
 
 st.set_page_config(layout="wide")
 
@@ -70,11 +69,21 @@ def parse_progress_from_log(log_content):
 
 
 def read_latest_log():
-    """최신 로그 파일 읽기"""
+    """최신 로그 파일 읽기 (성능 최적화)"""
     try:
-        if os.path.exists(LOG_FILE_PATH):
-            with open(LOG_FILE_PATH, 'r', encoding='utf-8') as f:
-                return f.read()
+        log_files = [f for f in os.listdir(LOG_FILE_PATH)
+                     if f.endswith('.log') and os.path.isfile(os.path.join(LOG_FILE_PATH, f))]
+        if log_files:
+            # 최신 파일 찾기 (수정 시간 기준)
+            latest_file = max(log_files,
+                              key=lambda x: os.path.getmtime(os.path.join(LOG_FILE_PATH, x)))
+            latest_path = os.path.join(LOG_FILE_PATH, latest_file)
+
+            file_size = os.path.getsize(latest_path)
+            if file_size > 0:
+                with open(latest_path, 'r', encoding='utf-8', errors='replace') as f:
+                    f.seek(max(0, file_size - 10000))
+                    return f.read()
     except Exception as e:
         st.error(f"로그 파일 읽기 오류: {e}")
     return ""
@@ -82,14 +91,46 @@ def read_latest_log():
 
 def is_process_running():
     """trading 프로세스가 실행 중인지 확인"""
+    import platform
+    import psutil
+
     try:
-        result = subprocess.run(['pgrep', '-f', 'main.py'], capture_output=True, text=True)
-        return len(result.stdout.strip()) > 0
-    except:
-        # Windows의 경우 tasklist 사용
+        # psutil을 사용해서 프로세스 확인 (터미널 창이 안 뜸)
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                cmdline = proc.info['cmdline']
+                if cmdline and any('main.py' in str(arg) for arg in cmdline):
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return False
+    except ImportError:
+        # psutil이 없는 경우 기존 방식 사용하되 터미널 창 숨기기
+        system = platform.system()
         try:
-            result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq python.exe'], capture_output=True, text=True)
-            return 'main.py' in result.stdout
+            if system == "Windows":
+                # Windows에서 터미널 창 숨기기
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
+                result = subprocess.run(
+                    ['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV'],
+                    capture_output=True,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                return 'main.py' in result.stdout
+            else:
+                # Linux/macOS
+                result = subprocess.run(
+                    ['pgrep', '-f', 'main.py'],
+                    capture_output=True,
+                    text=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                return len(result.stdout.strip()) > 0
         except:
             return False
 
@@ -98,16 +139,12 @@ def display_progress_monitor():
     """진행률 모니터링 표시"""
     st.subheader("📊 실시간 진행률 모니터링")
 
-    if not is_process_running():
-        st.info("현재 실행 중인 매매 전략이 없습니다.")
-        return
-
     # 실시간 업데이트를 위한 플레이스홀더
     progress_placeholder = st.empty()
     status_placeholder = st.empty()
 
     # 자동 새로고침 옵션
-    auto_refresh = st.checkbox("자동 새로고침 (3초 간격)", value=True, key="progress_refresh")
+    auto_refresh = st.checkbox("자동 새로고침 (5초 간격)", value=False, key="progress_refresh")
 
     # 수동 새로고침 버튼
     if st.button("🔄 새로고침", key="manual_refresh"):
@@ -141,19 +178,20 @@ def display_progress_monitor():
 
     # 최근 로그 표시
     with status_placeholder.container():
-        st.subheader("📝 최근 로그 (마지막 20줄)")
-        recent_logs = log_content.split('\n')[-20:] if log_content else []
+        st.subheader("📝 최근 로그 (마지막 15줄)")
+        recent_logs = log_content.split('\n')[-15:] if log_content else []
         log_text = '\n'.join(recent_logs)
         st.text_area("", value=log_text, height=200, key="recent_logs")
 
-    # 자동 새로고침
+    # 자동 새로고침 (사용자가 체크한 경우에만)
     if auto_refresh:
-        time.sleep(3)
+        time.sleep(5)
         st.rerun()
 
 
 def main():
     st.title("📈 주식 매매 전략 관리 프로그램 (with secretary)")
+    st.markdown(f"**👤 계좌 주인: `{ACCOUNT_OWNER_NAME}`**")
     config = load_strategy_config()
 
     # 탭으로 구성 변경
@@ -222,12 +260,6 @@ def main():
     with tab2:
         st.subheader("⚡ 매매 전략 수동 실행")
 
-        # 현재 실행 상태 표시
-        if is_process_running():
-            st.warning("⚠️ 현재 다른 매매 전략이 실행 중입니다. 진행률 모니터링 탭에서 확인하세요.")
-        else:
-            st.success("✅ 새로운 전략을 실행할 수 있습니다.")
-
         selected_strategy = st.selectbox("실행할 전략 선택", STRATEGY_OPTIONS, key='manual_exec')
 
         # 실행 모드 선택
@@ -237,7 +269,7 @@ def main():
             horizontal=True
         )
 
-        if st.button("전략 실행", disabled=is_process_running()):
+        if st.button("전략 실행"):
             if execution_mode == "터미널에서 실행":
                 # 터미널에서 실행
                 import platform

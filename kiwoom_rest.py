@@ -98,7 +98,7 @@ class KiwoomREST:
         계좌 잔고 조회 (2025 REST API, 연속조회 지원)
         :param qry_tp: 조회구분 1:합산, 2:개별
         :param dmst_stex_tp: 국내거래소구분 KRX:한국거래소
-        :return: 잔고조회 결과 (dict, 기존 구조와 동일)
+        :return: 잔고조회 결과 (dict, 기존 구조와 동일, 융자 종목 제외)
         """
         endpoint = "/api/dostk/acnt"
         api_id = "kt00018"
@@ -109,6 +109,7 @@ class KiwoomREST:
         all_result = None
         cont_yn = 'N'
         next_key = ''
+
         while True:
             headers = {
                 "Content-Type": "application/json;charset=UTF-8",
@@ -121,21 +122,31 @@ class KiwoomREST:
             time.sleep(KIWOOM_API_INTERVAL)
             logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
             logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
+
             resp_json = resp.json()
             if all_result is None:
                 all_result = resp_json.copy()
                 all_result['acnt_evlt_remn_indv_tot'] = []
+
             # 데이터 누적 (예: 'acnt_evlt_remn_indv_tot' 등)
             if 'acnt_evlt_remn_indv_tot' in resp_json:
                 mapped_list = []
                 real_server = False  # 실제 서버 여부 판단 필요시 수정
+
                 for stock in resp_json['acnt_evlt_remn_indv_tot']:
-                    mapped_list.append(self._map_balance_stock(stock, real_server=real_server))
+                    mapped_stock = self._map_balance_stock(stock, real_server=real_server)
+
+                    # 융자 종목이 아닌 경우만 추가
+                    if "*" not in mapped_stock['name']:
+                        mapped_list.append(mapped_stock)
+
                 all_result['acnt_evlt_remn_indv_tot'].extend(mapped_list)
+
             cont_yn = resp.headers.get('cont-yn', 'N')
             next_key = resp.headers.get('next-key', '')
             if cont_yn != 'Y':
                 break
+
         return all_result if all_result is not None else {}
 
     def _build_order_data(self, stock_code, quantity, price, tr_type, cond_price, order_price, market, extra=None):
@@ -169,7 +180,7 @@ class KiwoomREST:
         """
         주문 응답에서 성공 여부를 판단 (return_code == '0'이면 성공)
         """
-        return resp_json.get("return_code") == "0"
+        return resp_json.get("return_code") == 0
 
     def place_cash_buy_order(self, stock_code, quantity, price=None, market='KRX', tr_type=None, cond_price='', order_price=None, order_style=None):
         """

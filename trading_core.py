@@ -917,7 +917,7 @@ class Trading:
             orig_order_no=order['ord_no'],
             stock_code=order['stk_cd'],
             quantity=int(order['oso_qty']),
-            market=self.exchange
+            market=order['stex_tp_txt']
         )
 
     def cancel_not_done_credit_sell_order(self, order):
@@ -928,7 +928,7 @@ class Trading:
             orig_order_no=order['ord_no'],
             stock_code=order['stk_cd'],
             quantity=int(order['oso_qty']),
-            market=self.exchange
+            market=order['stex_tp_txt']
         )
 
     def set_exchange(self):
