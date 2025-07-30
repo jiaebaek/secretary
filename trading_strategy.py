@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 from logger import logger
 from time import sleep
+
+from nxt_stock_list import NXT_STOCK_LIST
 from trading_core import Trading
 import random
 
@@ -115,6 +117,8 @@ class TradingStrategy(ABC):
         completed = 0
 
         for stock in self.user_stock_list:
+            if stock['code'] in NXT_STOCK_LIST:
+                continue
             remain = int(stock['available_num'])
             remain = self.trading.sell_user_stock(stock, self.trading.sell_earning_rate[0], remain,
                                                   self.trading.sell_stock_amount[0], after_market=True)
@@ -131,6 +135,8 @@ class TradingStrategy(ABC):
         completed_credit = 0
 
         for stock in self.user_credit_stock_list:
+            if stock['code'] in NXT_STOCK_LIST:
+                continue
             remain = int(stock['possession_num'])
             for i in range(len(self.trading.sell_credit_earninig_rate_after_market)):
                 if self.trading.sell_credit_earninig_rate_after_market[i] == 0:
