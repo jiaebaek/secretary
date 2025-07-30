@@ -1,3 +1,5 @@
+import json
+
 import requests
 import time
 from logger import logger
@@ -33,6 +35,132 @@ class KiwoomREST:
         if not self.access_token or time.time() > self.token_expire_time:
             self.get_access_token()
 
+    def _safe_post(self, url, headers, data, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                resp = requests.post(url, headers=headers, json=data, timeout=30)
+                time.sleep(KIWOOM_API_INTERVAL)
+                logger.debug(f"[KiwoomREST] API CALL: url={url}, data={data}")
+                resp_json = resp.json()
+                logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
+                return resp_json
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, json.JSONDecodeError) as e:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.debug(
+                        f"[KiwoomREST] Retryable error, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries}) - {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"[KiwoomREST] Max retries exceeded: {e}")
+                    raise
+            except Exception as e:
+                logger.exception(f"[KiwoomREST] Non-retryable error occurred: {e}")
+                raise
+
+    def request_with_continuation(self, endpoint, api_id, data, result_key=None):
+        """연속조회가 필요한 API를 위한 헬퍼 메소드"""
+        self.ensure_token()
+        all_result = None
+        cont_yn = 'N'
+        next_key = ''
+
+        while True:
+            headers = {
+                "Content-Type": "application/json;charset=UTF-8",
+                "Authorization": f"Bearer {self.access_token}",
+                "api-id": api_id,
+                "cont-yn": cont_yn,
+                "next-key": next_key
+            }
+
+            # 재시도 로직이 포함된 요청
+            url = f"{self.BASE_URL}{endpoint}"
+            max_retries = 3
+            resp_json = None
+            resp = None
+
+            for attempt in range(max_retries):
+                try:
+                    resp = requests.post(url, headers=headers, json=data, timeout=30)
+                    time.sleep(KIWOOM_API_INTERVAL)
+                    logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
+
+                    # HTTP 상태 코드 확인
+                    if resp.status_code != 200:
+                        logger.warning(
+                            f"[KiwoomREST] HTTP {resp.status_code} on attempt {attempt + 1}: {resp.text[:200]}")
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt
+                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            logger.error(f"[KiwoomREST] Final attempt failed with HTTP {resp.status_code}")
+                            resp.raise_for_status()
+
+                    # 응답 내용 확인
+                    if not resp.text.strip():
+                        logger.warning(f"[KiwoomREST] Empty response on attempt {attempt + 1}")
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt
+                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            logger.error("[KiwoomREST] Final attempt returned empty response")
+                            raise ValueError("Empty response from API")
+
+                    # JSON 파싱 시도
+                    try:
+                        resp_json = resp.json()
+                        logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
+                        break  # 성공하면 루프 탈출
+                    except requests.exceptions.JSONDecodeError as e:
+                        logger.warning(f"[KiwoomREST] JSON decode error on attempt {attempt + 1}: {e}")
+                        logger.warning(f"[KiwoomREST] Response text: '{resp.text[:200]}...'")
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt
+                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            logger.error(f"[KiwoomREST] Final attempt failed with JSON decode error: {e}")
+                            raise
+
+                except requests.exceptions.ConnectionError as e:
+                    logger.warning(f"[KiwoomREST] Connection error on attempt {attempt + 1}: {e}")
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt
+                        logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"[KiwoomREST] Max retries exceeded: {e}")
+                        raise
+
+                except Exception as e:
+                    logger.error(f"[KiwoomREST] Unexpected error on attempt {attempt + 1}: {e}")
+                    raise
+
+            if resp_json is None:
+                break
+
+            # 결과 누적
+            if all_result is None:
+                all_result = resp_json.copy()
+                if result_key and result_key in resp_json:
+                    all_result[result_key] = []
+
+            if result_key and result_key in resp_json:
+                all_result[result_key].extend(resp_json[result_key])
+
+            cont_yn = resp.headers.get('cont-yn', 'N')
+            next_key = resp.headers.get('next-key', '')
+            if cont_yn != 'Y':
+                break
+
+        return all_result if all_result is not None else {}
+
     def request(self, endpoint, api_id, data=None):
         self.ensure_token()
         url = f"{self.BASE_URL}{endpoint}"
@@ -41,28 +169,7 @@ class KiwoomREST:
             "Authorization": f"Bearer {self.access_token}",
             "api-id": api_id
         }
-        
-        # 재시도 로직 추가
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                resp = requests.post(url, headers=headers, json=data, timeout=30)
-                time.sleep(KIWOOM_API_INTERVAL)
-                logger.debug(f"[KiwoomREST] API CALL: url={url}, api_id={api_id}, data={data}")
-                logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
-                return resp.json()
-            except requests.exceptions.ConnectionError as e:
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # 1초, 2초, 4초
-                    logger.debug(f"[KiwoomREST] Connection error, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    logger.debug(f"[KiwoomREST] Max retries exceeded: {e}")
-                    raise
-            except Exception as e:
-                logger.debug(f"[KiwoomREST] Unexpected error: {e}")
-                raise
+        return self._safe_post(url, headers, data)
 
     def _map_balance_stock(self, stock, real_server=False):
         """
@@ -106,48 +213,23 @@ class KiwoomREST:
             "qry_tp": qry_tp,
             "dmst_stex_tp": dmst_stex_tp
         }
-        all_result = None
-        cont_yn = 'N'
-        next_key = ''
 
-        while True:
-            headers = {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": f"Bearer {self.access_token}",
-                "api-id": api_id,
-                "cont-yn": cont_yn,
-                "next-key": next_key
-            }
-            resp = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, json=data)
-            time.sleep(KIWOOM_API_INTERVAL)
-            logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-            logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
+        result = self.request_with_continuation(endpoint, api_id, data, 'acnt_evlt_remn_indv_tot')
 
-            resp_json = resp.json()
-            if all_result is None:
-                all_result = resp_json.copy()
-                all_result['acnt_evlt_remn_indv_tot'] = []
+        # 융자 종목 필터링 및 매핑
+        if 'acnt_evlt_remn_indv_tot' in result:
+            mapped_list = []
+            real_server = False  # 실제 서버 여부 판단 필요시 수정
 
-            # 데이터 누적 (예: 'acnt_evlt_remn_indv_tot' 등)
-            if 'acnt_evlt_remn_indv_tot' in resp_json:
-                mapped_list = []
-                real_server = False  # 실제 서버 여부 판단 필요시 수정
+            for stock in result['acnt_evlt_remn_indv_tot']:
+                mapped_stock = self._map_balance_stock(stock, real_server=real_server)
+                # 융자 종목이 아닌 경우만 추가
+                if "*" not in mapped_stock['name']:
+                    mapped_list.append(mapped_stock)
 
-                for stock in resp_json['acnt_evlt_remn_indv_tot']:
-                    mapped_stock = self._map_balance_stock(stock, real_server=real_server)
+            result['acnt_evlt_remn_indv_tot'] = mapped_list
 
-                    # 융자 종목이 아닌 경우만 추가
-                    if "*" not in mapped_stock['name']:
-                        mapped_list.append(mapped_stock)
-
-                all_result['acnt_evlt_remn_indv_tot'].extend(mapped_list)
-
-            cont_yn = resp.headers.get('cont-yn', 'N')
-            next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
-                break
-
-        return all_result if all_result is not None else {}
+        return result
 
     def _build_order_data(self, stock_code, quantity, price, tr_type, cond_price, order_price, market, extra=None):
         """
@@ -362,33 +444,7 @@ class KiwoomREST:
             "stk_cd": stock_code,
             "stex_tp": stex_tp
         }
-        all_result = None
-        cont_yn = 'N'
-        next_key = ''
-        while True:
-            headers = {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": f"Bearer {self.access_token}",
-                "api-id": api_id,
-                "cont-yn": cont_yn,
-                "next-key": next_key
-            }
-            resp = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, json=data)
-            time.sleep(KIWOOM_API_INTERVAL)
-            logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-            logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
-            resp_json = resp.json()
-            if all_result is None:
-                all_result = resp_json.copy()
-                if 'oso' in resp_json:
-                    all_result['oso'] = []
-            if 'oso' in resp_json:
-                all_result['oso'].extend(resp_json['oso'])
-            cont_yn = resp.headers.get('cont-yn', 'N')
-            next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
-                break
-        return all_result if all_result is not None else {}
+        return self.request_with_continuation(endpoint, api_id, data, 'oso')
 
     def _map_credit_stock(self, stock):
         """
@@ -455,39 +511,19 @@ class KiwoomREST:
             "qry_tp": qry_tp,
             "dmst_stex_tp": dmst_stex_tp
         }
-        all_result = None
-        cont_yn = 'N'
-        next_key = ''
-        while True:
-            headers = {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": f"Bearer {self.access_token}",
-                "api-id": api_id,
-                "cont-yn": cont_yn,
-                "next-key": next_key
-            }
-            resp = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, json=data)
-            time.sleep(KIWOOM_API_INTERVAL)
-            logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-            logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
-            resp_json = resp.json()
-            if all_result is None:
-                all_result = resp_json.copy()
-                if 'stk_acnt_evlt_prst' in resp_json:
-                    all_result['stk_acnt_evlt_prst'] = []
-            if 'stk_acnt_evlt_prst' in resp_json:
-                mapped_list = []
-                for stock in resp_json['stk_acnt_evlt_prst']:
-                    name = stock.get('stk_nm', '')
-                    if not name.startswith('*'):
-                        continue  # 이름이 *로 시작하는 종목만 저장
-                    mapped_list.append(self._map_credit_stock(stock))
-                all_result['stk_acnt_evlt_prst'].extend(mapped_list)
-            cont_yn = resp.headers.get('cont-yn', 'N')
-            next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
-                break
-        return all_result if all_result is not None else {}
+        result = self.request_with_continuation(endpoint, api_id, data, 'stk_acnt_evlt_prst')
+
+        # 신용 종목 필터링 및 매핑
+        if 'stk_acnt_evlt_prst' in result:
+            mapped_list = []
+            for stock in result['stk_acnt_evlt_prst']:
+                name = stock.get('stk_nm', '')
+                if not name.startswith('*'):
+                    continue  # 이름이 *로 시작하는 종목만 저장
+                mapped_list.append(self._map_credit_stock(stock))
+            result['stk_acnt_evlt_prst'] = mapped_list
+
+        return result
 
     def get_cash_detail(self, qry_tp='3'):
         """
@@ -500,33 +536,7 @@ class KiwoomREST:
         data = {
             "qry_tp": qry_tp
         }
-        all_result = None
-        cont_yn = 'N'
-        next_key = ''
-        while True:
-            headers = {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": f"Bearer {self.access_token}",
-                "api-id": api_id,
-                "cont-yn": cont_yn,
-                "next-key": next_key
-            }
-            resp = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, json=data)
-            time.sleep(KIWOOM_API_INTERVAL)
-            logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-            logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
-            resp_json = resp.json()
-            if all_result is None:
-                all_result = resp_json.copy()
-                if 'stk_entr_prst' in resp_json:
-                    all_result['stk_entr_prst'] = []
-            if 'stk_entr_prst' in resp_json:
-                all_result['stk_entr_prst'].extend(resp_json['stk_entr_prst'])
-            cont_yn = resp.headers.get('cont-yn', 'N')
-            next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
-                break
-        return all_result if all_result is not None else {}
+        return self.request_with_continuation(endpoint, api_id, data, 'stk_entr_prst')
 
     def get_interesting_stocks(self, stk_cd=''):
         """
@@ -539,33 +549,7 @@ class KiwoomREST:
         data = {
             "stk_cd": stk_cd
         }
-        all_result = None
-        cont_yn = 'N'
-        next_key = ''
-        while True:
-            headers = {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": f"Bearer {self.access_token}",
-                "api-id": api_id,
-                "cont-yn": cont_yn,
-                "next-key": next_key
-            }
-            resp = requests.post(f"{self.BASE_URL}{endpoint}", headers=headers, json=data)
-            time.sleep(KIWOOM_API_INTERVAL)
-            logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-            logger.debug(f"[KiwoomREST] API RESP: {resp.json()}")
-            resp_json = resp.json()
-            if all_result is None:
-                all_result = resp_json.copy()
-                if 'atn_stk_infr' in resp_json:
-                    all_result['atn_stk_infr'] = []
-            if 'atn_stk_infr' in resp_json:
-                all_result['atn_stk_infr'].extend(resp_json['atn_stk_infr'])
-            cont_yn = resp.headers.get('cont-yn', 'N')
-            next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
-                break
-        return all_result if all_result is not None else {}
+        return self.request_with_continuation(endpoint, api_id, data, 'atn_stk_infr')
 
     def get_stock_price(self, stock_code):
         """
@@ -595,4 +579,4 @@ class KiwoomREST:
         result = self.request(endpoint, api_id, data=data)
         return result
 
-    # (여기에 잔고조회, 주문 등 기능 함수가 추가될 예정) 
+    # (여기에 잔고조회, 주문 등 기능 함수가 추가될 예정)
