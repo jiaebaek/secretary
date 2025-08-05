@@ -113,7 +113,7 @@ class KiwoomREST:
                     # JSON 파싱 시도
                     try:
                         resp_json = resp.json()
-                        logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
+                        # logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
                         break  # 성공하면 루프 탈출
                     except requests.exceptions.JSONDecodeError as e:
                         logger.warning(f"[KiwoomREST] JSON decode error on attempt {attempt + 1}: {e}")
