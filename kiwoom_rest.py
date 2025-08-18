@@ -3,6 +3,8 @@ import json
 import requests
 import time
 from logger import logger
+import asyncio
+from kiwoom_condition import KiwoomConditionSearcher
 
 KIWOOM_API_INTERVAL = 0.2
 
@@ -579,4 +581,26 @@ class KiwoomREST:
         result = self.request(endpoint, api_id, data=data)
         return result
 
-    # (여기에 잔고조회, 주문 등 기능 함수가 추가될 예정)
+    def get_condition_stocks(self, seq: str, timeout: int = 15):
+        """
+        조건검색 실행 후 'A' 제거된 종목코드 리스트 반환
+        :return: list[str] or {"error": "..."}
+        """
+
+        async def _run():
+            searcher = KiwoomConditionSearcher(self.access_token, recv_timeout=7.0)
+            raw = await searcher.fetch(seq=seq, throttle_ms=150, max_pages=50)
+            if isinstance(raw, dict) and "error" in raw:
+                return raw
+            # 9001 필드에서 'A' 제거
+            codes = []
+            for item in raw:
+                code = item.get("9001", "")
+                if code:
+                    codes.append(code.lstrip("A"))
+            return codes
+
+        try:
+            return asyncio.run(asyncio.wait_for(_run(), timeout=timeout))
+        except asyncio.TimeoutError:
+            return {"error": "조건검색 전체 타임아웃"}

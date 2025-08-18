@@ -255,9 +255,9 @@ class AutoNewBuyingStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
+        self.trading.get_interesting_stock()
         self.get_user_stock()
         if self.trading.new_buy_stock:
-            self.trading.get_interesting_stock()
             self.trading.get_not_done_order()
 
             logger.debug('>>>>>>>>>>>> 현금주식 신규 매수 <<<<<<<<<<<<<<')
@@ -328,11 +328,11 @@ class AutoCreditBuyingStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
+        self.trading.get_interesting_stock()
         self.get_user_credit_stock()
         self.get_user_stock()
 
         logger.debug('>>>>>>>>>>>> 신용주식 신규 매수 <<<<<<<<<<<<<<')
-        self.trading.get_interesting_stock()
         self.trading.buy_new_credit_stock()
 
 

@@ -260,10 +260,9 @@ class Trading:
 
     def get_interesting_stock(self):
         # 관심종목 조회 (REST)
-        result = self.kiwoom.get_interesting_stocks()
-        self.interesting_stocks = [item['stk_cd'] for item in result.get('atn_stk_infr', [])]
+        self.interesting_stocks = self.kiwoom.get_condition_stocks('0')
         logger.debug(f'관심종목 : {self.interesting_stocks}')
-        # TODO: 조건검색 후 관심종목 추가
+
 
     def get_current_price(self, code):
         # 현재가 조회 (REST)
@@ -382,7 +381,7 @@ class Trading:
             if self.is_stock_in_user_credit_stock(self.interesting_stocks[key]) \
                     or self.is_stock_in_user_stock(self.interesting_stocks[key]) \
                     or key in bought_key:
-                logger.debug('이미 보유하고 있거나 신규매수한 종목입니다. skip!! [{}]'.format(self.interesting_stocks[key]))
+                logger.debug('이미 보유하고 있는 종목입니다. skip!! [{}]'.format(self.interesting_stocks[key]))
                 continue
             bought_key.append(key)
             logger.debug(" - 현재가 정보 요청")
