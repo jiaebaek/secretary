@@ -269,7 +269,8 @@ class Trading:
         if self.exchange == 'NXT':
             code += '_NX'
         result = self.kiwoom.get_stock_price(code)
-        price = int(float(result.get('cur_prc', 0)))  # 'cur_prc'가 현재가 필드명
+        price = result['cur_prc'].lstrip("+-")
+        price = int(float(price))  # 'cur_prc'가 현재가 필드명
         name = result.get('stk_nm', '')  # 종목명 필드명
         return price, name
 
