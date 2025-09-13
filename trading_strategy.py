@@ -195,6 +195,13 @@ class TradingStrategy(ABC):
             else:
                 self.trading.cancel_not_done_sell_order(order)
 
+    def _cancel_credit_sell_order_not_nxt(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매도(NOT NXT) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_sell()
+        for order in self.trading.not_done_sell:
+            if "신용" in order['io_tp_nm'] and order['stk_cd'] not in NXT_STOCK_LIST:
+                logger.debug(f"미체결 신용매도주문(NOT NXT) : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_credit_sell_order(order)
 
 class AutoBothSellingStrategy(TradingStrategy):
     """Strategy for menu '0': 자동-전체 (신용일반 주식 매도)"""
@@ -454,6 +461,14 @@ class CancelAllSellOrderStrategy(TradingStrategy):
         self._cancel_all_sell_order()
 
 
+class CancelCreditSellOrderNotNXTStrategy(TradingStrategy):
+    """Strategy for menu '35': 미체결 신용매도(Not NXT)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_sell_order_not_nxt()
+
+
 class GetUserStocks(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
@@ -489,6 +504,7 @@ class TradingStrategyFactory:
         '32': CancelCreditSellOrderKRXStrategy,
         '33': CancelCreditSellOrderNXTStrategy,
         '34': CancelAllSellOrderStrategy,
+        '35': CancelCreditSellOrderNotNXTStrategy,
         '100': GetUserStocks,
         '101': GetUserCreditStocks
     }
