@@ -6,7 +6,7 @@ from logger import logger
 import asyncio
 from kiwoom_condition import KiwoomConditionSearcher
 
-KIWOOM_API_INTERVAL = 0.2
+KIWOOM_API_INTERVAL = 0.3
 
 class KiwoomREST:
     BASE_URL = "https://api.kiwoom.com"
@@ -84,8 +84,8 @@ class KiwoomREST:
             for attempt in range(max_retries):
                 try:
                     resp = requests.post(url, headers=headers, json=data, timeout=30)
-                    time.sleep(KIWOOM_API_INTERVAL)
                     logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
+                    time.sleep(KIWOOM_API_INTERVAL)
 
                     # HTTP 상태 코드 확인
                     if resp.status_code != 200:
