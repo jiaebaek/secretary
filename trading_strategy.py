@@ -343,6 +343,42 @@ class AutoCreditBuyingStrategy(TradingStrategy):
         self.trading.buy_new_credit_stock()
 
 
+class AutoCreditAveragingDownStrategy(TradingStrategy):
+    """Strategy for menu '14': 장중-신용-물타기-매수"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self.get_user_credit_stock()
+
+        logger.debug('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
+        logger.debug('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
+
+        # 종목별로 가장 최근 매수만 선택
+        latest_stocks = {}
+        for stock in self.user_credit_stock_list:
+            name = stock['name']
+            loan_date = stock.get("loan_date", "")
+            if name not in latest_stocks:
+                latest_stocks[name] = stock
+            else:
+                if loan_date > latest_stocks[name].get("loan_date", ""):
+                    latest_stocks[name] = stock
+
+        # 전체 종목 수
+        total_stocks = len(latest_stocks)
+        completed = 0
+
+        for stock in latest_stocks.values():
+            if stock['name'] not in self.trading.except_credit_rebuy_list:
+                self.trading.rebuy_user_credit_stock(stock)
+                completed += 1
+                logger.info(
+                    f"==================== 신용 물타기 매수 진행 중... [{completed}/{total_stocks}] ===================="
+                )
+            else:
+                logger.debug(f"신용 물타기 제외 종목입니다 : {stock}")
+
+
 class AutoAfterMarketNXTTradingStrategy(TradingStrategy):
     """Strategy for menu '16': 자동-신용일반-주식-시간외NXT-매도"""
 
@@ -495,6 +531,7 @@ class TradingStrategyFactory:
         '12': AutoCreditSellingStrategy,
         '12-1': AutoCreditSellingLoopStrategy,
         '13': AutoCreditBuyingStrategy,
+        '14': AutoCreditAveragingDownStrategy,
         '16': AutoAfterMarketNXTTradingStrategy,
         '17': AutoCreditAfterMarketStrategy,
         '18': AutoCreditBeforeFinishMarketSellingStrategy,

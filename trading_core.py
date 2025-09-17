@@ -41,6 +41,10 @@ DEFAULT_BUY_NEW_STOCK_NUM = "기본 보유종목 개수"
 STATUS = "운영상태"
 EXCEPT_REBUY = "물타기 제외 종목"
 BUY_NEW_STOCK = "신규종목매수"
+REBUY_CREDIT_EARNING_RATE = "신용 물타기 기준(%)"
+REBUY_CREDIT_STOCK_AMOUNT = "신용 물타기 매수금액"
+EXCEPT_CREDIT_REBUY = "신용 물타기 제외 종목"
+
 
 # Sleep intervals
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
@@ -88,6 +92,9 @@ class Trading:
         self.new_buy_stock = True
         self.exchange = "KRX"
         self.nxt_list = NXT_STOCK_LIST
+        self.rebuy_credit_earning_rate = -10  # 기본값
+        self.rebuy_credit_stock_amount = 500000  # 기본값
+        self.except_credit_rebuy_list = []
 
     def update_options(self):
         conn = sqlite3.connect(DB_PATH)
@@ -118,6 +125,12 @@ class Trading:
                 self.except_rebuy_list = row[1].split('/')
             elif row[2] == BUY_NEW_STOCK:
                 self.new_buy_stock = row[1]
+            elif row[2] == REBUY_CREDIT_EARNING_RATE:
+                self.rebuy_credit_earning_rate = float(row[1])
+            elif row[2] == REBUY_CREDIT_STOCK_AMOUNT:
+                self.rebuy_credit_stock_amount = int(row[1])
+            elif row[2] == EXCEPT_CREDIT_REBUY:
+                self.except_credit_rebuy_list = row[1].split('/')
 
         cur.execute("select * from 매도설정")
         rows = cur.fetchall()
@@ -269,8 +282,12 @@ class Trading:
         if self.exchange == 'NXT':
             code += '_NX'
         result = self.kiwoom.get_stock_price(code)
-        price = result['cur_prc'].lstrip("+-")
-        price = int(float(price))  # 'cur_prc'가 현재가 필드명
+        price_str = result['cur_prc'].lstrip("+-")
+        if price_str == "":  # 빈 문자열 처리
+            logger.error("[ERROR] 현재가 정보가 없습니다!!!!")
+            price = 0
+        else:
+            price = int(float(price_str))  # 'cur_prc'가 현재가 필드명
         name = result.get('stk_nm', '')  # 종목명 필드명
         return price, name
 
@@ -357,6 +374,9 @@ class Trading:
                 bought_key.append(key)
                 logger.debug(" - 현재가 정보 요청")
                 price, name = self.get_current_price(self.interesting_stocks[key])
+                if price == 0:
+                    logger.error(f"매수 주문 실패: 현재가 정보 없음")
+                    continue
                 logger.debug("현재가 정보 요청 완료")
                 # -1프로로 매수 예약
                 if self._buy_designated_price(self.interesting_stocks[key], self.buy_new_stock_amount, -1, price):
@@ -387,6 +407,9 @@ class Trading:
             bought_key.append(key)
             logger.debug(" - 현재가 정보 요청")
             price, name = self.get_current_price(self.interesting_stocks[key])
+            if price == 0:
+                logger.error(f"매수 주문 실패: 현재가 정보 없음")
+                continue
             logger.debug("현재가 정보 요청 완료")
             # -1프로로 매수 예약
             if self._buy_credit_designated_price(self.interesting_stocks[key], self.buy_new_credit_stock_amount, -0.1,
@@ -398,6 +421,9 @@ class Trading:
         if 'J' in stock_code:
             return
         price, name = self.get_current_price(stock_code)
+        if price == 0:
+            logger.error(f"매수 주문 실패: 현재가 정보 없음")
+            return False
         num = int(amount / price) if amount else 1
         if buy_amount and (buy_amount + (num * price) > self.max_amount):
             num = int((self.max_amount - buy_amount) / price)
@@ -408,6 +434,33 @@ class Trading:
         result = self.kiwoom.place_cash_buy_order(stock_code, num, price=price, market=self.exchange,
                                                   tr_type=HOGATYPE['지정가'])
         logger.debug(f"------- 현재가로 매수!! 종목명 : {name} 추가매수가 : {price}원 수량 : {num}개 매입금액 : {num * price}원")
+        if result is True:
+            return True
+        else:
+            _, msg = result
+            logger.error(f"매수 주문 실패: {msg}")
+            return False
+
+    def _buy_credit_current_price(self, stock_code, amount):
+        if 'J' in stock_code:
+            return
+        price, name = self.get_current_price(stock_code)
+        if price == 0:
+            logger.error(f"매수 주문 실패: 현재가 정보 없음")
+            return False
+
+        num = int(amount / price) if amount else 1
+        if num == 0:
+            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
+            return False
+
+        result = self.kiwoom.place_credit_buy_order(
+            stock_code, num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
+        logger.debug(
+            f"------- 신용 현재가 매수!! 종목명 : {name} 매수가 : {price}원 "
+            f"수량 : {num}개 매입금액 : {num * price}원"
+        )
         if result is True:
             return True
         else:
@@ -488,6 +541,10 @@ class Trading:
 
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
         price, name = self.get_current_price(stock['code'])
+        if price == 0:
+            logger.error(f"매도 주문 실패: 현재가 정보 없음")
+            return remain
+
         num = int(sell_stock_amount / price)
         if num == 0:
             num = 1
@@ -548,6 +605,9 @@ class Trading:
 
         logger.debug(" - 현재가 정보 요청 : {}".format(stock))
         price, name = self.get_current_price(stock['code'])
+        if price == 0:
+            logger.error(f"매도 주문 실패: 현재가 정보 없음")
+            return remain
         num = 1
         if num > remain:
             num = remain
@@ -761,6 +821,17 @@ class Trading:
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
+    def rebuy_user_credit_stock(self, stock):
+        logger.debug(
+            f"### 신용 물타기 매수 기준 : {self.rebuy_credit_earning_rate}% "
+            f"종목명 : {stock['name']} 현재수익률 : {stock['earning_rate']}%"
+        )
+        if float(stock["earning_rate"]) <= self.rebuy_credit_earning_rate:
+            self._buy_credit_current_price(
+                stock['code'],
+                self.rebuy_credit_stock_amount
+            )
+
     def rebuy_user_stock(self, stock):
         # 물타기 매수#
 
@@ -949,6 +1020,3 @@ class Trading:
     def is_nxt_available(self, stock_code):
         code = stock_code[1:] if stock_code.startswith('A') else stock_code
         return code in self.nxt_list
-
-
-
