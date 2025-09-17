@@ -6,7 +6,7 @@ from logger import logger
 import asyncio
 from kiwoom_condition import KiwoomConditionSearcher
 
-KIWOOM_API_INTERVAL = 0.3
+KIWOOM_API_INTERVAL = 0.2
 
 class KiwoomREST:
     BASE_URL = "https://api.kiwoom.com"
