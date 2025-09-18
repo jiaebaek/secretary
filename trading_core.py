@@ -44,7 +44,7 @@ BUY_NEW_STOCK = "신규종목매수"
 REBUY_CREDIT_EARNING_RATE = "신용 물타기 기준(%)"
 REBUY_CREDIT_STOCK_AMOUNT = "신용 물타기 매수금액"
 EXCEPT_CREDIT_REBUY = "신용 물타기 제외 종목"
-
+CREDIT_MAX_AMOUNT = "신용 물타기 최대금액"
 
 # Sleep intervals
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
@@ -83,7 +83,8 @@ class Trading:
         self.sell_credit_stock_amount_finish_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.sell_credit_stock_amount_after_market = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.rebuy_1_stock_earning_rate = -3
-        self.max_amount = 10000000
+        self.max_amount = 1000000  # 현금 물타기 한도
+        self.credit_max_amount = 1000000  # 신용 물타기 한도
         self.default_buy_new_stock_num = 100
         self.remain_money_buy_new_stock_down_rate = {}
         self.remain_money_buy_new_stock_up_rate = {}
@@ -131,6 +132,8 @@ class Trading:
                 self.rebuy_credit_stock_amount = int(row[1])
             elif row[2] == EXCEPT_CREDIT_REBUY:
                 self.except_credit_rebuy_list = row[1].split('/')
+            elif row[2] == CREDIT_MAX_AMOUNT:
+                self.credit_max_amount = int(row[1])
 
         cur.execute("select * from 매도설정")
         rows = cur.fetchall()
@@ -441,7 +444,7 @@ class Trading:
             logger.error(f"매수 주문 실패: {msg}")
             return False
 
-    def _buy_credit_current_price(self, stock_code, amount):
+    def _buy_credit_current_price(self, stock_code, amount, buy_amount=0):
         if 'J' in stock_code:
             return
         price, name = self.get_current_price(stock_code)
@@ -450,8 +453,16 @@ class Trading:
             return False
 
         num = int(amount / price) if amount else 1
-        if num == 0:
-            logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
+
+        # 신용용 MAX 체크
+        if buy_amount and (buy_amount + (num * price) > self.credit_max_amount):
+            num = int((self.credit_max_amount - buy_amount) / price)
+
+        if num <= 0:
+            logger.debug(
+                f"------- 매수 할 수 있는 수량이 0 입니다. "
+                f"(보유금액: {buy_amount}, max: {self.credit_max_amount}, 현재가: {price})"
+            )
             return False
 
         result = self.kiwoom.place_credit_buy_order(
@@ -829,7 +840,8 @@ class Trading:
         if float(stock["earning_rate"]) <= self.rebuy_credit_earning_rate:
             self._buy_credit_current_price(
                 stock['code'],
-                self.rebuy_credit_stock_amount
+                self.rebuy_credit_stock_amount,
+                int(stock['buy_amount'])  # 보유 금액 전달
             )
 
     def rebuy_user_stock(self, stock):
