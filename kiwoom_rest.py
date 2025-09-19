@@ -185,6 +185,7 @@ class KiwoomREST:
         possession_num = str(int(stock.get('rmnd_qty', '0')))
         available_num = str(int(stock.get('trde_able_qty', '0')))
         earning_rate = stock.get('prft_rt', '0')
+        loan_date = stock.get('crd_loan_dt', '')
         if real_server:
             try:
                 earning_rate = float(earning_rate) / 100
@@ -199,14 +200,16 @@ class KiwoomREST:
             'buy_amount': buy_amount,
             'possession_num': possession_num,
             'available_num': available_num,
-            'earning_rate': '{}'.format(earning_rate)
+            'earning_rate': '{}'.format(earning_rate),
+            'loan_date': loan_date
         }
 
-    def get_balance(self, qry_tp='1', dmst_stex_tp='KRX'):
+    def get_balance(self, qry_tp='1', dmst_stex_tp='KRX', include_credit=False):
         """
         계좌 잔고 조회 (2025 REST API, 연속조회 지원)
         :param qry_tp: 조회구분 1:합산, 2:개별
         :param dmst_stex_tp: 국내거래소구분 KRX:한국거래소
+        - include_credit=True → qry_tp='2' → 신용잔고까지 포함 (대출일별 세부내역 반환)
         :return: 잔고조회 결과 (dict, 기존 구조와 동일, 융자 종목 제외)
         """
         endpoint = "/api/dostk/acnt"
@@ -226,8 +229,9 @@ class KiwoomREST:
             for stock in result['acnt_evlt_remn_indv_tot']:
                 mapped_stock = self._map_balance_stock(stock, real_server=real_server)
                 # 융자 종목이 아닌 경우만 추가
-                if "*" not in mapped_stock['name']:
-                    mapped_list.append(mapped_stock)
+                if not include_credit and "*" in mapped_stock['name']:
+                        continue
+                mapped_list.append(mapped_stock)
 
             result['acnt_evlt_remn_indv_tot'] = mapped_list
 

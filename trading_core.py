@@ -61,6 +61,8 @@ class Trading:
         self.kiwoom = KiwoomREST(KIWOOM_APPKEY, KIWOOM_APPSECRET)
         self.user_stock_num = 0
         self.user_stock_list = []
+        self.user_credit_stock_num = 0
+        self.user_credit_stock_list = []
         self.interesting_stocks = []
         self.not_done_orders_num = 0
         self.not_done_orders = []
@@ -259,8 +261,25 @@ class Trading:
     def get_user_credit_stock(self, after_market=False):
         # 신용잔고조회 (REST)
         market = "KRX" if after_market else self.exchange
-        result = self.kiwoom.get_account_evaluation(qry_tp='0', dmst_stex_tp=market)
-        self.user_credit_stock_list = result.get('stk_acnt_evlt_prst', [])
+
+        # 1) 신용잔고 평가 조회
+        result_eval = self.kiwoom.get_account_evaluation(qry_tp='0', dmst_stex_tp=market)
+        self.user_credit_stock_list = result_eval.get('stk_acnt_evlt_prst', [])
+
+        # 2) 신용잔고 상세 (대출일별 보유수량/매도가능수량 포함)
+        result = self.kiwoom.get_balance(qry_tp='2', dmst_stex_tp=market, include_credit=True)
+        balance_list = result.get('acnt_evlt_remn_indv_tot', [])
+
+        # 3) (종목명 + 대출일) 로 매핑
+        balance_map = {
+            (item['name'], item.get('loan_date', '')): item.get('available_num', 0)
+            for item in balance_list
+        }
+
+        for stock in self.user_credit_stock_list:
+            key = (stock['name'], stock.get('loan_date', ''))
+            stock['available_num'] = balance_map.get(key, 0)
+
         self.user_credit_stock_num = len(self.user_credit_stock_list)
         logger.debug(f'user credit stock cnt : {self.user_credit_stock_num}')
         logger.debug(self.user_credit_stock_list)
