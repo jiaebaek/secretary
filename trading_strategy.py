@@ -151,6 +151,48 @@ class TradingStrategy(ABC):
             logger.info(
                 f"==================== 신용주식 시간외 매도 진행 중... [{completed_credit}/{total_credit_stocks}] ====================")
 
+    def _cancel_buy_order_krx(self):
+        logger.debug('>>>>>>>>>>> 미체결 현금매수(KRX) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_order()
+        for order in self.trading.not_done_orders:
+            if "신용" not in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
+                logger.debug(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_sell_order(order)
+
+    def _cancel_buy_order_nxt(self):
+        logger.debug('>>>>>>>>>>> 미체결 현금매수(NXT) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_order()
+        for order in self.trading.not_done_orders:
+            if "신용" not in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
+                logger.debug(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_sell_order(order)
+
+    def _cancel_credit_buy_order_krx(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매수(KRX) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_order()
+        for order in self.trading.not_done_orders:
+            if "신용" in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
+                logger.debug(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_credit_sell_order(order)
+
+    def _cancel_credit_buy_order_nxt(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매수(NXT) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_order()
+        for order in self.trading.not_done_orders:
+            if "신용" in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
+                logger.debug(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_credit_sell_order(order)
+
+    def _cancel_all_buy_order(self):
+        logger.debug('>>>>>>>>>>> 미체결 현금신용매수(KRX/NXT) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_order()
+        for order in self.trading.not_done_orders:
+            logger.debug(f"미체결 매수주문 : {order['stk_nm']} / {order['ord_no']}")
+            if "신용" in order['io_tp_nm']:
+                self.trading.cancel_not_done_credit_sell_order(order)
+            else:
+                self.trading.cancel_not_done_sell_order(order)
+
     def _cancel_sell_order_krx(self):
         logger.debug('>>>>>>>>>>> 미체결 현금매도(KRX) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
@@ -503,6 +545,46 @@ class CancelCreditSellOrderNotNXTStrategy(TradingStrategy):
         self._cancel_credit_sell_order_not_nxt()
 
 
+class CancelBuyOrderKRXStrategy(TradingStrategy):
+    """Strategy for menu '36': 미체결 현금매수(KRX)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_buy_order_krx()
+
+
+class CancelBuyOrderNXTStrategy(TradingStrategy):
+    """Strategy for menu '37': 미체결 현금매수(NXT)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_buy_order_nxt()
+
+
+class CancelCreditBuyOrderKRXStrategy(TradingStrategy):
+    """Strategy for menu '38': 미체결 신용매수(KRX)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_buy_order_krx()
+
+
+class CancelCreditBuyOrderNXTStrategy(TradingStrategy):
+    """Strategy for menu '39': 미체결 신용매수(NXT)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_buy_order_nxt()
+
+
+class CancelAllBuyOrderStrategy(TradingStrategy):
+    """Strategy for menu '40': 미체결 현금/신용매수(KRX/NXT)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_all_buy_order()
+
+
 class GetUserStocks(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
@@ -540,6 +622,11 @@ class TradingStrategyFactory:
         '33': CancelCreditSellOrderNXTStrategy,
         '34': CancelAllSellOrderStrategy,
         '35': CancelCreditSellOrderNotNXTStrategy,
+        '36': CancelBuyOrderKRXStrategy,
+        '37': CancelBuyOrderNXTStrategy,
+        '38': CancelCreditBuyOrderKRXStrategy,
+        '39': CancelCreditBuyOrderNXTStrategy,
+        '40': CancelAllBuyOrderStrategy,
         '100': GetUserStocks,
         '101': GetUserCreditStocks
     }
