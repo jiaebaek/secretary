@@ -295,7 +295,18 @@ class Trading:
 
     def get_interesting_stock(self):
         # 관심종목 조회 (REST)
-        self.interesting_stocks = self.kiwoom.get_condition_stocks('0')
+        all_codes = []
+        for seq in ['0', '1']:
+            try:
+                codes = self.kiwoom.get_condition_stocks(seq)
+                if codes:
+                    all_codes.extend(codes)
+            except Exception as e:
+                logger.warning(f"[조건식 {seq}] 실행 실패: {e}")
+                continue
+
+        # 중복 제거
+        self.interesting_stocks = list(set(all_codes))
         logger.debug(f'관심종목 : {self.interesting_stocks}')
 
 
