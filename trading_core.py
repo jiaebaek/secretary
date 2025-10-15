@@ -351,7 +351,7 @@ class Trading:
     def get_not_done_order(self):  # 미체결 매수
         # REST 미체결 주문 조회
         result = self.kiwoom.get_unfilled_orders('', all_stk_tp='0', tr_type='2',
-                                                 stex_tp='1' if self.exchange == 'KRX' else '2')
+                                                 stex_tp='0')
         self.not_done_orders = result.get('oso', [])
         self.not_done_orders_num = len(self.not_done_orders)
         logger.debug(f"미체결 매수주문: {self.not_done_orders}")
@@ -359,7 +359,7 @@ class Trading:
     def get_not_done_sell(self):  # 미체결 매도
         # REST 미체결 주문 조회
         result = self.kiwoom.get_unfilled_orders('', all_stk_tp='0', tr_type='1',
-                                                 stex_tp='1' if self.exchange == 'KRX' else '2')
+                                                 stex_tp='0')
         self.not_done_sell = result.get('oso', [])
         self.not_done_sell_num = len(self.not_done_sell)
         logger.debug(f"미체결 매도주문: {self.not_done_sell}")

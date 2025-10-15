@@ -225,6 +225,14 @@ class TradingStrategy(ABC):
                 logger.debug(f"미체결 신용매도주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
+    def _cancel_credit_sell_order(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_sell()
+        for order in self.trading.not_done_sell:
+            logger.debug(f"미체결 매도주문 : {order['stk_nm']} / {order['ord_no']}")
+            if "신용" in order['io_tp_nm']:
+                self.trading.cancel_not_done_credit_sell_order(order)
+
     def _cancel_all_sell_order(self):
         logger.debug('>>>>>>>>>>> 미체결 현금신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
@@ -529,6 +537,14 @@ class CancelCreditSellOrderNXTStrategy(TradingStrategy):
         self._cancel_credit_sell_order_nxt()
 
 
+class CancelCreditSellOrderStrategy(TradingStrategy):
+    """Strategy for menu '41': 미체결 신용매도(KRX/NXT)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_sell_order()
+
+
 class CancelAllSellOrderStrategy(TradingStrategy):
     """Strategy for menu '34': 미체결 현금/신용매도(KRX/NXT)주문 취소"""
 
@@ -620,6 +636,7 @@ class TradingStrategyFactory:
         '31': CancelSellOrderNXTStrategy,
         '32': CancelCreditSellOrderKRXStrategy,
         '33': CancelCreditSellOrderNXTStrategy,
+        '41': CancelCreditSellOrderStrategy,
         '34': CancelAllSellOrderStrategy,
         '35': CancelCreditSellOrderNotNXTStrategy,
         '36': CancelBuyOrderKRXStrategy,
