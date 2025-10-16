@@ -37,7 +37,7 @@ class KiwoomREST:
         if not self.access_token or time.time() > self.token_expire_time:
             self.get_access_token()
 
-    def _safe_post(self, url, headers, data, max_retries=3):
+    def _safe_post(self, url, headers, data, max_retries=10):
         for attempt in range(max_retries):
             try:
                 resp = requests.post(url, headers=headers, json=data, timeout=30)
@@ -77,7 +77,7 @@ class KiwoomREST:
 
             # 재시도 로직이 포함된 요청
             url = f"{self.BASE_URL}{endpoint}"
-            max_retries = 3
+            max_retries = 10
             resp_json = None
             resp = None
 
