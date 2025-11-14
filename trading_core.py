@@ -1048,13 +1048,16 @@ class Trading:
         now = datetime.datetime.now()
         now_tupule = now.timetuple()
         logger.debug(now_tupule)
-        if now_tupule.tm_hour < 9:
-            if now_tupule.tm_min < 30:
-                self.exchange = "NXT"
-            else:
-                self.exchange = "KRX"
-        elif now_tupule.tm_hour < 15:
+        hour = now_tupule.tm_hour
+        minute = now_tupule.tm_min
+        
+        # 8시 30분 이전: NXT
+        if hour < 8 or (hour == 8 and minute < 30):
+            self.exchange = "NXT"
+        # 8시 30분부터 14시 59분까지: KRX
+        elif hour < 15:
             self.exchange = "KRX"
+        # 15시 00분 이후: NXT
         else:
             self.exchange = "NXT"
         logger.debug(f"거래소 : {self.exchange}")
