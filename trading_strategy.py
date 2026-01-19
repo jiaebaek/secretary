@@ -243,12 +243,20 @@ class TradingStrategy(ABC):
             else:
                 self.trading.cancel_not_done_sell_order(order)
 
-    def _cancel_credit_sell_order_not_nxt(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(NOT NXT) 주문 취소 <<<<<<<<<<<')
+    def _cancel_credit_sell_order_not_nxt_stock(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매도(NOT NXT 종목) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['io_tp_nm'] and order['stk_cd'] not in NXT_STOCK_LIST:
-                logger.debug(f"미체결 신용매도주문(NOT NXT) : {order['stk_nm']} / {order['ord_no']}")
+                logger.debug(f"미체결 신용매도주문(NOT NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
+                self.trading.cancel_not_done_credit_sell_order(order)
+
+    def _cancel_credit_sell_order_nxt_stock(self):
+        logger.debug('>>>>>>>>>>> 미체결 신용매도(NXT 종목) 주문 취소 <<<<<<<<<<<')
+        self.trading.get_not_done_sell()
+        for order in self.trading.not_done_sell:
+            if "신용" in order['io_tp_nm'] and order['stk_cd'] in NXT_STOCK_LIST:
+                logger.debug(f"미체결 신용매도주문(NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
 class AutoBothSellingStrategy(TradingStrategy):
@@ -553,12 +561,20 @@ class CancelAllSellOrderStrategy(TradingStrategy):
         self._cancel_all_sell_order()
 
 
-class CancelCreditSellOrderNotNXTStrategy(TradingStrategy):
-    """Strategy for menu '35': 미체결 신용매도(Not NXT)주문 취소"""
+class CancelCreditSellOrderNotNXTStockStrategy(TradingStrategy):
+    """Strategy for menu '35': 미체결 신용매도(Not NXT 종목)주문 취소"""
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-        self._cancel_credit_sell_order_not_nxt()
+        self._cancel_credit_sell_order_not_nxt_stock()
+
+
+class CancelCreditSellOrderNXTStockStrategy(TradingStrategy):
+    """Strategy for menu '42': 미체결 신용매도(NXT 종목)주문 취소"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self._cancel_credit_sell_order_nxt_stock()
 
 
 class CancelBuyOrderKRXStrategy(TradingStrategy):
@@ -638,12 +654,13 @@ class TradingStrategyFactory:
         '33': CancelCreditSellOrderNXTStrategy,
         '41': CancelCreditSellOrderStrategy,
         '34': CancelAllSellOrderStrategy,
-        '35': CancelCreditSellOrderNotNXTStrategy,
+        '35': CancelCreditSellOrderNotNXTStockStrategy,
         '36': CancelBuyOrderKRXStrategy,
         '37': CancelBuyOrderNXTStrategy,
         '38': CancelCreditBuyOrderKRXStrategy,
         '39': CancelCreditBuyOrderNXTStrategy,
         '40': CancelAllBuyOrderStrategy,
+        '42': CancelCreditSellOrderNXTStockStrategy,
         '100': GetUserStocks,
         '101': GetUserCreditStocks
     }
