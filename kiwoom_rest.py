@@ -9,7 +9,7 @@ from kiwoom_condition import KiwoomConditionSearcher
 KIWOOM_API_INTERVAL = 0.2
 
 class KiwoomREST:
-    BASE_URL = "https://api.kiwoom.com"
+    BASE_URL = "https://api2.kiwoom.com"
 
     def __init__(self, appkey, appsecret):
         self.appkey = appkey
