@@ -203,17 +203,20 @@ def main():
         with col1:
             st.subheader("⏰ 시간대별 매매 전략 스케줄 설정")
 
+            # 1. 중복 추가를 위해 st.selectbox 방식으로 변경
             with st.form('add_strategy'):
                 new_time = st.text_input('시간대 (예: 08:00)', '')
-                new_strategies = st.multiselect('추가할 전략 선택', STRATEGY_OPTIONS)
-                submitted = st.form_submit_button('추가')
+                selected_strategy = st.selectbox('추가할 전략 선택', STRATEGY_OPTIONS)
+                submitted = st.form_submit_button('전략 추가')
 
-                if submitted and new_time and new_strategies:
+                if submitted and new_time:
                     if new_time not in config:
                         config[new_time] = []
-                    config[new_time].extend([s for s in new_strategies if s not in config[new_time]])
+
+                    # 중복 체크 없이 리스트에 추가
+                    config[new_time].append(selected_strategy)
                     save_strategy_config(config)
-                    st.success(f'{new_time}에 전략 추가됨.')
+                    st.success(f'{new_time}에 {selected_strategy} 전략이 추가되었습니다.')
                     st.rerun()
 
             st.markdown("---")
@@ -224,38 +227,19 @@ def main():
             else:
                 for time_key in sorted(config.keys()):
                     st.markdown(f"**{time_key}**")
-                    for strategy in config[time_key]:
+                    # 2. 인덱스(i)를 사용하여 중복된 이름의 전략도 고유하게 식별
+                    for i, strategy in enumerate(config[time_key]):
                         col_a, col_b = st.columns([4, 1])
-                        col_a.markdown(f"- {strategy}")
-                        if col_b.button('삭제', key=f"{time_key}_{strategy}"):
-                            config[time_key].remove(strategy)
+                        col_a.markdown(f"{i + 1}. {strategy}")
+
+                        # 3. 삭제 버튼의 key에 인덱스를 포함하여 충돌 방지
+                        if col_b.button('삭제', key=f"{time_key}_{strategy}_{i}"):
+                            config[time_key].pop(i)  # 인덱스로 삭제
                             if not config[time_key]:
                                 del config[time_key]
                             save_strategy_config(config)
-                            st.success(f"{time_key}의 {strategy} 전략 삭제됨.")
+                            st.success(f"{time_key}의 {strategy} 전략이 삭제되었습니다.")
                             st.rerun()
-
-        with col2:
-            st.subheader("📜 스케줄러 실행 로그 보기")
-            st.info("💡 수동 실행 로그는 진행률 모니터링 탭에서 확인하세요.")
-
-            log_files = sorted([f for f in os.listdir(SCHEDULER_LOG_DIR) if f.endswith(".log")], reverse=True)
-            if not log_files:
-                st.info("스케줄러 실행 로그가 없습니다.")
-            else:
-                selected_log = st.selectbox("로그 파일 선택", log_files)
-                refresh = st.checkbox("자동 새로고침 (5초)", key="auto_refresh_scheduler")
-
-                def read_log(path):
-                    with open(path, "r", encoding="utf-8") as f:
-                        return f.readlines()[-200:]
-
-                log_path = os.path.join(SCHEDULER_LOG_DIR, selected_log)
-                st.text_area("로그 내용", value="".join(read_log(log_path)), height=400, key="scheduler_logs")
-
-                if refresh:
-                    time.sleep(5)
-                    st.rerun()
 
     with tab2:
         st.subheader("⚡ 매매 전략 수동 실행")
