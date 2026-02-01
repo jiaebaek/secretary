@@ -442,8 +442,17 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
         completed = 0
 
         for stock in latest_stocks.values():
+            # 현금주식 여부 판별 (대출일이 없으면 현금주식)
+            is_cash_stock = stock.get("loan_date", "") == ""
+            buy_amount = int(stock.get('buy_amount', 0))
+
+            if is_cash_stock and buy_amount > self.trading.max_amount:
+                logger.debug(
+                    f"--- [제한] {stock['name']}: 현금보유액({buy_amount})이 MAX({self.trading.max_amount}) 초과로 물타기 제외")
+                continue
+
             if stock['name'] not in self.trading.except_credit_rebuy_list:
-                self.trading.rebuy_user_credit_stock(stock)
+                self.trading.rebuy_user_credit_stock(stock, is_cash_stock=is_cash_stock)
                 completed += 1
                 logger.info(
                     f"==================== 신용 물타기 매수 진행 중... [{completed}/{total_stocks}] ===================="

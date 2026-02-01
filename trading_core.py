@@ -478,9 +478,10 @@ class Trading:
             logger.error(f"매수 주문 실패: {msg}")
             return False
 
-    def _buy_credit_current_price(self, stock_code, amount, buy_amount=0):
+    def _buy_credit_current_price(self, stock_code, amount, skip_max_check=False, buy_amount=None):
         if 'J' in stock_code:
             return
+
         price, name = self.get_current_price(stock_code)
         if price == 0:
             logger.error(f"매수 주문 실패: 현재가 정보 없음")
@@ -489,8 +490,9 @@ class Trading:
         num = int(amount / price) if amount else 1
 
         # 신용용 MAX 체크
-        if buy_amount and (buy_amount + (num * price) > self.credit_max_amount):
-            num = int((self.credit_max_amount - buy_amount) / price)
+        if not skip_max_check and buy_amount:
+            if buy_amount + (num * price) > self.credit_max_amount:
+                num = int((self.credit_max_amount - buy_amount) / price)
 
         if num <= 0:
             logger.debug(
@@ -866,7 +868,7 @@ class Trading:
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
-    def rebuy_user_credit_stock(self, stock):
+    def rebuy_user_credit_stock(self, stock, is_cash_stock=False):
         logger.debug(
             f"### 신용 물타기 매수 기준 : {self.rebuy_credit_earning_rate}% "
             f"종목명 : {stock['name']} 현재수익률 : {stock['earning_rate']}%"
@@ -875,7 +877,8 @@ class Trading:
             self._buy_credit_current_price(
                 stock['code'],
                 self.rebuy_credit_stock_amount,
-                int(stock['buy_amount'])  # 보유 금액 전달
+                skip_max_check=is_cash_stock,
+                buy_amount=int(stock['buy_amount'])  # 보유 금액 전달
             )
 
     def rebuy_user_stock(self, stock):
