@@ -608,3 +608,19 @@ class KiwoomREST:
             return asyncio.run(asyncio.wait_for(_run(), timeout=timeout))
         except asyncio.TimeoutError:
             return {"error": "조건검색 전체 타임아웃"}
+
+    def get_realized_profit_loss(self):
+        """
+        일자별실현손익요청 (REST API, ka10074)
+        당일의 총 매수금액과 매도금액을 확인하기 위해 사용합니다.
+        """
+        import datetime
+        today = datetime.datetime.now().strftime('%Y%m%d')  # 2026년 현재 날짜 기준
+
+        endpoint = "/api/dostk/acnt"
+        api_id = "ka10074"
+        data = {
+            'strt_dt': today,  # 시작일자
+            'end_dt': today,  # 종료일자
+        }
+        return self.request(endpoint, api_id, data=data)

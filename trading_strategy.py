@@ -391,11 +391,24 @@ class AutoCreditBuyingStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
+
+        # 1. 당일 매수/매도 차이 금액 확인
+        current_diff = self.trading.get_today_trading_diff()
+        limit_diff = self.trading.max_trading_diff
+
+        logger.debug(f"매수-매도 차이 체크: {current_diff}원 (기준: {limit_diff}원)")
+
+        # 2. 매수금액 - 매도금액이 기준보다 크면 매수 중단
+        if current_diff >= limit_diff:
+            logger.info(f"!!! 신규 매수 제한: 당일 매수-매도 차이({current_diff}원)가 기준({limit_diff}원)을 초과함")
+            return
+
+        # 3. 기준 이내일 경우 기존 매수 로직 수행
+        logger.debug('>>>>>>>>>>>> 매수 조건 충족: 신용주식 신규 매수 진행 <<<<<<<<<<<<<<')
         self.trading.get_interesting_stock()
         self.get_user_credit_stock()
         self.get_user_stock()
 
-        logger.debug('>>>>>>>>>>>> 신용주식 신규 매수 <<<<<<<<<<<<<<')
         self.trading.buy_new_credit_stock()
 
 
@@ -405,18 +418,22 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self.get_user_credit_stock()
+        self.get_user_stock()
 
         logger.debug('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
         logger.debug('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
 
-        # 종목별로 가장 최근 매수만 선택
+        # 현금 주식과 신용 주식을 합쳐서 동일 종목 중 가장 최근 매수(신용 우선)를 선택합니다.
+        all_holdings = self.user_credit_stock_list + self.user_stock_list
         latest_stocks = {}
-        for stock in self.user_credit_stock_list:
+        for stock in all_holdings:
             name = stock['name']
-            loan_date = stock.get("loan_date", "")
+            loan_date = stock.get("loan_date", "") # 현금 주식은 빈 문자열
+
             if name not in latest_stocks:
                 latest_stocks[name] = stock
             else:
+                # 대출일(loan_date)이 더 최근인 것을 우선순위로 둡니다.
                 if loan_date > latest_stocks[name].get("loan_date", ""):
                     latest_stocks[name] = stock
 

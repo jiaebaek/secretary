@@ -45,6 +45,7 @@ REBUY_CREDIT_EARNING_RATE = "신용 물타기 기준(%)"
 REBUY_CREDIT_STOCK_AMOUNT = "신용 물타기 매수금액"
 EXCEPT_CREDIT_REBUY = "신용 물타기 제외 종목"
 CREDIT_MAX_AMOUNT = "신용 물타기 최대금액"
+MAX_TRADING_DIFF = "당일매수매도차이금액"
 
 # Sleep intervals
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
@@ -98,6 +99,7 @@ class Trading:
         self.rebuy_credit_earning_rate = -10  # 기본값
         self.rebuy_credit_stock_amount = 500000  # 기본값
         self.except_credit_rebuy_list = []
+        self.max_trading_diff = 30000000  # 기본값 설정
 
     def update_options(self):
         conn = sqlite3.connect(DB_PATH)
@@ -136,6 +138,8 @@ class Trading:
                 self.except_credit_rebuy_list = row[1].split('/')
             elif row[2] == CREDIT_MAX_AMOUNT:
                 self.credit_max_amount = int(row[1])
+            if row[2] == MAX_TRADING_DIFF:
+                self.max_trading_diff = row[1]  # DB에서 설정값 로드
 
         cur.execute("select * from 매도설정")
         rows = cur.fetchall()
@@ -1065,3 +1069,18 @@ class Trading:
     def is_nxt_available(self, stock_code):
         code = stock_code[1:] if stock_code.startswith('A') else stock_code
         return code in self.nxt_list
+
+    def get_today_trading_diff(self):
+        """ka10074 API를 사용하여 (총 매수 - 총 매도) 금액을 계산합니다."""
+        try:
+            res = self.kiwoom.get_realized_profit_loss()
+            # API 응답: "tot_buy_amt", "tot_sell_amt"
+            buy_amt = int(res.get('tot_buy_amt', 0))
+            sell_amt = int(res.get('tot_sell_amt', 0))
+
+            diff = buy_amt - sell_amt
+            logger.debug(f"[실현손익 데이터 확인] 총 매수: {buy_amt}, 총 매도: {sell_amt}, 차이: {diff}")
+            return diff
+        except Exception as e:
+            logger.error(f"거래 차이 계산 실패: {e}")
+            return 999999999  # 안전을 위해 매수 제한값이 넘는 큰 값 반환
