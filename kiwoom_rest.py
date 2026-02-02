@@ -28,8 +28,7 @@ class KiwoomREST:
             "appkey": self.appkey,
             "secretkey": self.appsecret
         }
-        response = requests.post(url, headers=headers, json=data)
-        resp_json = response.json()
+        resp_json = self._safe_post(url, headers=headers, data=data)
         self.access_token = resp_json['token']
         self.token_expire_time = time.time() + int(resp_json.get('expires_in', 3600)) - 60
 
