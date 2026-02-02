@@ -418,7 +418,7 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self.get_user_credit_stock()
-        self.get_user_stock()
+        # self.get_user_stock() # TODO: 임시 제거 검증후 다시 추가
 
         logger.debug('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
         logger.debug('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
