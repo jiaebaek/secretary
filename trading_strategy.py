@@ -427,7 +427,7 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
         all_holdings = self.user_credit_stock_list + self.user_stock_list
         latest_stocks = {}
         for stock in all_holdings:
-            name = stock['name']
+            name = stock['name'].lstrip('*')
             loan_date = stock.get("loan_date", "") # 현금 주식은 빈 문자열
 
             if name not in latest_stocks:
