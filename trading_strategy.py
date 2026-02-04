@@ -758,6 +758,38 @@ class SaveHoldingSummaryStrategy(TradingStrategy):
         )
 
 
+class ClearLocalOrderHistoryStrategy(TradingStrategy):
+    """Strategy for menu '201': 로컬 주문 히스토리 전체 삭제"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+
+        logger.debug(">>>>>>>>>>> local_order_history 전체 삭제 시작 <<<<<<<<<<<")
+
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+
+        # 테이블이 없으면 생성만 하고, 내용은 어차피 비워질 예정
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS local_order_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_no TEXT,
+                stock_name TEXT,
+                loan_date TEXT,
+                buy_price INTEGER,
+                created_at TEXT
+            )
+            """
+        )
+
+        # 모든 기록 삭제
+        cur.execute("DELETE FROM local_order_history")
+        conn.commit()
+        conn.close()
+
+        logger.info("local_order_history 테이블의 모든 기록을 삭제했습니다.")
+
 class TradingStrategyFactory:
     """Factory class to create appropriate trading strategy"""
 
@@ -793,6 +825,7 @@ class TradingStrategyFactory:
         '100': GetUserStocks,
         '101': GetUserCreditStocks,
         '200': SaveHoldingSummaryStrategy,
+        '201': ClearLocalOrderHistoryStrategy,
     }
 
     @classmethod

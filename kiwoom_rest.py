@@ -269,26 +269,32 @@ class KiwoomREST:
         """
         return resp_json.get("return_code") == 0
 
-    def place_cash_buy_order(self, stock_code, quantity, price=None, market='KRX', tr_type=None, cond_price='', order_price=None, order_style=None):
+    def place_cash_buy_order(self, stock_code, quantity, price=None, market='KRX',
+                             tr_type=None, cond_price='', order_price=None, order_style=None):
         """
         현금 매수 주문 (2025 REST API)
         """
         data = self._build_order_data(stock_code, quantity, price, tr_type, cond_price, order_price, market)
         resp = self._place_order("/api/dostk/ordr", "kt10000", data)
         if self._is_order_success(resp):
-            return True
+            # 성공 시: (True, 주문번호) 반환
+            return True, resp.get("output", {}).get("ord_no")
         else:
+            # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
 
-    def place_cash_sell_order(self, stock_code, quantity, price=None, market='KRX', tr_type=None, cond_price='', order_price=None, order_style=None):
+    def place_cash_sell_order(self, stock_code, quantity, price=None, market='KRX',
+                              tr_type=None, cond_price='', order_price=None, order_style=None):
         """
         현금 매도 주문 (2025 REST API)
         """
         data = self._build_order_data(stock_code, quantity, price, tr_type, cond_price, order_price, market)
         resp = self._place_order("/api/dostk/ordr", "kt10001", data)
         if self._is_order_success(resp):
-            return True
+            # 성공 시: (True, 주문번호) 반환
+            return True, resp.get("output", {}).get("ord_no")
         else:
+            # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
 
     def place_credit_buy_order(self, stock_code, quantity, price, market='KRX', tr_type='0', cond_price=''):
@@ -307,8 +313,10 @@ class KiwoomREST:
         }
         resp = self._place_order(endpoint, api_id, data)
         if self._is_order_success(resp):
-            return True
+            # 성공 시: (True, 주문번호) 반환
+            return True, resp.get("output", {}).get("ord_no")
         else:
+            # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
 
     def place_credit_sell_order(self, stock_code, quantity, price, market='KRX',
@@ -330,8 +338,10 @@ class KiwoomREST:
         }
         resp = self._place_order(endpoint, api_id, data)
         if self._is_order_success(resp):
-            return True
+            # 성공 시: (True, 주문번호) 반환
+            return True, resp.get("output", {}).get("ord_no")
         else:
+            # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
 
     def _build_cancel_modify_data(self, orig_order_no, quantity, price, tr_type, cond_price, order_price, extra=None):

@@ -468,13 +468,14 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
         # REST 매수 주문
-        result = self.kiwoom.place_cash_buy_order(stock_code, num, price=price, market=self.exchange,
-                                                  tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_cash_buy_order(
+            stock_code, num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug(f"------- 현재가로 매수!! 종목명 : {name} 추가매수가 : {price}원 수량 : {num}개 매입금액 : {num * price}원")
-        if result is True:
+        if success:
             return True
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매수 주문 실패: {msg}")
             return False
 
@@ -501,17 +502,17 @@ class Trading:
             )
             return False
 
-        result = self.kiwoom.place_credit_buy_order(
+        success, detail = self.kiwoom.place_credit_buy_order(
             stock_code, num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
         )
         logger.debug(
             f"------- 신용 현재가 매수!! 종목명 : {name} 매수가 : {price}원 "
             f"수량 : {num}개 매입금액 : {num * price}원"
         )
-        if result is True:
+        if success:
             return True
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매수 주문 실패: {msg}")
             return False
 
@@ -538,13 +539,14 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
 
-        result = self.kiwoom.place_cash_buy_order(stock_code, num, price=price, market=self.exchange,
-                                                  tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_cash_buy_order(
+            stock_code, num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
             return True
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"지정가 매수 주문 실패: {msg}")
             return False
 
@@ -571,13 +573,14 @@ class Trading:
             logger.debug("------- 매수 할 수 있는 수량이 0 입니다.")
             return False
 
-        result = self.kiwoom.place_credit_buy_order(stock_code, num, price=price, market=self.exchange,
-                                                    tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_credit_buy_order(
+            stock_code, num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug("------- 지정가로 매수!! 추가매수가 : {}원 수량 : {}개 매입금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
             return True
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"신용 지정가 매수 주문 실패: {msg}")
             return False
 
@@ -601,13 +604,21 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                   tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_cash_sell_order(
+            stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -632,16 +643,25 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market='KRX', tr_type=HOGATYPE['시간외단일가']
+            )
         else:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+            )
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 지정가/시간외 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -662,13 +682,21 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                   tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_cash_sell_order(
+            stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug("------- 현재가로 매도!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 1주 현재가 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -691,16 +719,25 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market='KRX', tr_type=HOGATYPE['시간외단일가']
+            )
         else:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+            )
         logger.debug("------- 일괄 2주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 2주 지정가/시간외 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -723,16 +760,25 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market='KRX', tr_type=HOGATYPE['시간외단일가']
+            )
         else:
-            result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'])
+            success, detail = self.kiwoom.place_cash_sell_order(
+                stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+            )
         logger.debug("------- 일괄 1주 매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 1주 지정가/시간외 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -753,13 +799,21 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
 
-        result = self.kiwoom.place_cash_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                   tr_type=HOGATYPE['지정가'])
+        success, detail = self.kiwoom.place_cash_sell_order(
+            stock['code'], num, price=price, market=self.exchange, tr_type=HOGATYPE['지정가']
+        )
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 현금 일괄 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -786,16 +840,27 @@ class Trading:
             return remain - num
 
         if after_market:
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market='KRX',
+                tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date']
+            )
         else:
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market=self.exchange,
+                tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date']
+            )
         logger.debug("------- 신용 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 신용 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -818,16 +883,27 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:  # 시간외 단일가
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market='KRX',
+                tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date']
+            )
         else:
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market=self.exchange,
+                tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date']
+            )
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 신용 일괄 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -855,16 +931,27 @@ class Trading:
             logger.debug("매도 가능 수량 : 0")
             return remain - num
         if after_market:  # 시간외 단일가
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market='KRX',
-                                                       tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market='KRX',
+                tr_type=HOGATYPE['시간외단일가'], crd_loan_dt=stock['loan_date']
+            )
         else:
-            result = self.kiwoom.place_credit_sell_order(stock['code'], num, price=price, market=self.exchange,
-                                                       tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date'])
+            success, detail = self.kiwoom.place_credit_sell_order(
+                stock['code'], num, price=price, market=self.exchange,
+                tr_type=HOGATYPE['지정가'], crd_loan_dt=stock['loan_date']
+            )
         logger.debug("------- 일괄매도예약주문!! 매도가 : {}원 수량 : {}개 매도금액 : {}원".format(price, num, num * price))
-        if result is True:
+        if success:
+            # 신용 호가 지정 매도 주문 히스토리 저장
+            self.save_local_order_history(
+                detail,
+                stock.get('name', ''),
+                stock.get('loan_date', ''),
+                int(stock.get('buy_price', 0)),
+            )
             return remain - num
         else:
-            _, msg = result
+            msg = detail
             logger.error(f"매도 주문 실패: {msg}")
             return remain
 
@@ -1087,3 +1174,50 @@ class Trading:
         except Exception as e:
             logger.error(f"거래 차이 계산 실패: {e}")
             return 999999999  # 안전을 위해 매수 제한값이 넘는 큰 값 반환
+
+    def save_local_order_history(self, order_no, stock_name, loan_date, buy_price):
+        """
+        로컬 히스토리용 주문 기록 저장
+        - order_no: 주문번호
+        - stock_name: 종목 이름
+        - loan_date: 대출일자 (신용거래가 아닌 경우 빈 문자열 허용)
+        - buy_price: 주문 시 기준 매입가/평단가 (int 또는 str)
+        """
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+
+            # 테이블이 없으면 생성
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS local_order_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_no TEXT,
+                    stock_name TEXT,
+                    loan_date TEXT,
+                    buy_price INTEGER,
+                    created_at TEXT
+                )
+                """
+            )
+
+            from datetime import datetime
+            created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            cur.execute(
+                """
+                INSERT INTO local_order_history
+                (order_no, stock_name, loan_date, buy_price, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (str(order_no), stock_name, str(loan_date or ""), int(buy_price), created_at),
+            )
+
+            conn.commit()
+            conn.close()
+            logger.debug(
+                f"[LOCAL_HISTORY] 기록 저장 - ord_no={order_no}, name={stock_name}, "
+                f"loan_date={loan_date}, buy_price={buy_price}"
+            )
+        except Exception as e:
+            logger.error(f"[LOCAL_HISTORY] 저장 실패: {e}")
