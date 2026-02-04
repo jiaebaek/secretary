@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 from logger import logger
 from time import sleep
+import sqlite3
 
 from nxt_stock_list import NXT_STOCK_LIST
 from trading_core import Trading
+from config import DB_PATH
 import random
 
 
@@ -670,6 +672,92 @@ class GetUserCreditStocks(TradingStrategy):
         self.get_user_credit_stock()
 
 
+class SaveHoldingSummaryStrategy(TradingStrategy):
+    """Strategy for menu '200': 잔고 내역 저장 (일반+신용 보유금액 합산)"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+
+        logger.debug('>>>>>>>>>>> 잔고 내역 저장 (일반+신용 보유금액 합산) 시작 <<<<<<<<<<<')
+
+        # REST 를 통해 현재 잔고 조회 (예외를 피하기 위해 Trading 인스턴스의 메서드를 직접 사용)
+        cash_stocks = self.trading.get_user_stock()
+        credit_stocks = self.trading.get_user_credit_stock()
+
+        # 종목별 (코드+이름) 기준으로
+        #  - total: 현금+신용 합산 보유금액
+        #  - cash / credit: 각각의 보유금액
+        summary_total = {}
+        summary_cash = {}
+        summary_credit = {}
+
+        def add_stocks(stocks, is_credit: bool):
+            for stock in stocks or []:
+                code = stock.get('code', '')
+                name = stock.get('name', '').lstrip('*')
+                try:
+                    amount = int(stock.get('buy_amount', 0))
+                except (TypeError, ValueError):
+                    amount = 0
+
+                key = (code, name)
+                # 종목별 총합 (현금+신용)
+                summary_total[key] = summary_total.get(key, 0) + amount
+
+                # 현금 / 신용 각각 합산
+                if is_credit:
+                    summary_credit[key] = summary_credit.get(key, 0) + amount
+                else:
+                    summary_cash[key] = summary_cash.get(key, 0) + amount
+
+        add_stocks(cash_stocks, is_credit=False)
+        add_stocks(credit_stocks, is_credit=True)
+
+        # DB 저장: 테이블 생성 후 기존 데이터 삭제, 최신 데이터로 갱신
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS holding_summary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT,
+                name TEXT,
+                cash_amount INTEGER,
+                credit_amount INTEGER,
+                total_amount INTEGER,
+                updated_at TEXT
+            )
+            """
+        )
+
+        # 기존 데이터 전체 삭제
+        cur.execute("DELETE FROM holding_summary")
+
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        for (code, name), total_amount in summary_total.items():
+            cash_amount = int(summary_cash.get((code, name), 0))
+            credit_amount = int(summary_credit.get((code, name), 0))
+
+            cur.execute(
+                """
+                INSERT INTO holding_summary
+                (code, name, cash_amount, credit_amount, total_amount, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (code, name, cash_amount, credit_amount, total_amount, now_str),
+            )
+
+        conn.commit()
+        conn.close()
+
+        logger.info(
+            f"잔고 내역 저장 완료 - 총 {len(summary_total)}개 종목, 테이블 'holding_summary' 최신 상태로 갱신"
+        )
+
+
 class TradingStrategyFactory:
     """Factory class to create appropriate trading strategy"""
 
@@ -703,7 +791,8 @@ class TradingStrategyFactory:
         '40': CancelAllBuyOrderStrategy,
         '42': CancelCreditSellOrderNXTStockStrategy,
         '100': GetUserStocks,
-        '101': GetUserCreditStocks
+        '101': GetUserCreditStocks,
+        '200': SaveHoldingSummaryStrategy,
     }
 
     @classmethod
