@@ -771,14 +771,13 @@ class SaveHoldingSummaryStrategy(TradingStrategy):
         )
 
 
-class TestCancelUnfilledCreditSellStrategy(TradingStrategy):
-    """Strategy for menu '202': TEST-미체결-취소-매도
+class CancelUnfilledCreditSellStrategy(TradingStrategy):
+    """Strategy for menu '202': 추가매수-미체결-매도-취소
 
     조건:
-      - 가능수량 != 0 이고 보유수량 == 가능수량  → 매도 주문 없음 → 신규 매도 주문
       - 가능수량 != 0 이고 보유수량 != 가능수량 → 기존 매도 주문 + 추가 매수 →
-        해당 대출일자 미체결 주문 취소 후 다시 매도 주문
-      - 가능수량 == 0 → 매도 주문 스킵
+        해당 대출일자 미체결 주문 취소
+      - 가능수량 == 0 → 미체결 주문 확인 스킵
 
     매도 주문/취소 대상은 신용주식만을 대상으로 하며, local_order_history 에
     저장된 (order_no, stock_name, loan_date)를 이용해 미체결 주문과
@@ -787,7 +786,7 @@ class TestCancelUnfilledCreditSellStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-        logger.debug('>>>>>>>>>>> TEST-미체결-취소-매도 시작 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 추가매수-미체결-매도-취소 시작 <<<<<<<<<<<')
 
         # 1) 현재 신용잔고 조회 (보유수량/가능수량/대출일자 포함)
         self.get_user_credit_stock()
@@ -798,20 +797,6 @@ class TestCancelUnfilledCreditSellStrategy(TradingStrategy):
         # 3) local_order_history 에서 (order_no → (stock_name, loan_date)) 매핑 생성
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
-
-        # 테이블이 없을 수 있으므로 방어적으로 생성
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS local_order_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_no TEXT,
-                stock_name TEXT,
-                loan_date TEXT,
-                buy_price INTEGER,
-                created_at TEXT
-            )
-            """
-        )
 
         cur.execute("SELECT order_no, stock_name, loan_date FROM local_order_history")
         rows = cur.fetchall()
@@ -837,9 +822,6 @@ class TestCancelUnfilledCreditSellStrategy(TradingStrategy):
                 key = (order.get('stk_nm', ''), '')
             credit_orders_by_key[key].append(order)
 
-        total_stocks = len(self.user_credit_stock_list)
-        completed = 0
-
         # 5) 신용잔고(종목명+대출일자)별로 조건에 따라 주문/취소/재주문 처리
         for stock in self.user_credit_stock_list:
             name = stock.get('name', '')
@@ -856,70 +838,38 @@ class TestCancelUnfilledCreditSellStrategy(TradingStrategy):
                 available_num = 0
 
             logger.debug(
-                f"[TEST-미체결-취소-매도] 종목:{name}, 대출일자:{loan_date}, "
+                f"[추가매수-미체결-매도-취소] 종목:{name}, 대출일자:{loan_date}, "
                 f"보유수량:{possession_num}, 가능수량:{available_num}"
             )
 
             # 가능수량이 0이면 매도 주문 스킵
             if available_num == 0:
-                logger.debug("[TEST-미체결-취소-매도] 가능수량이 0이므로 매도 주문 스킵")
+                logger.debug("[추가매수-미체결-매도-취소] 가능수량이 0이므로 미체결 주문 확인 스킵")
+                continue
+
+            # 보유수량 == 가능수량 이면 (추가 매수 없다고 보고) 취소 로직 스킵
+            if possession_num == available_num:
+                logger.debug("[추가매수-미체결-매도-취소] 보유수량 == 가능수량 → 추가 매수 없음으로 판단, 취소 스킵")
                 continue
 
             key = (name, loan_date)
             related_orders = credit_orders_by_key.get(key, [])
 
-            # Case 1) 가능수량 != 0 이고 보유수량 == 가능수량 → 매도 주문이 없는 상태 → 신규 매도 주문
-            if available_num == possession_num:
-                logger.debug(
-                    "[TEST-미체결-취소-매도] 매도주문 없음으로 판단 → 신규 매도 주문 실행"
-                )
-
-                remain = self._sell_credit_stock_with_default_config(
-                    stock, available_num, after_market=False
-                )
-
-                completed += 1
-                logger.info(
-                    f"==================== TEST-미체결-취소-매도 (신규 매도주문) 진행 중... "
-                    f"[{completed}/{total_stocks}] ===================="
-                )
-                continue
-
             # Case 2) 가능수량 != 0 이고 보유수량 != 가능수량 → 기존 매도 주문 + 추가 매수 발생
             logger.debug(
-                "[TEST-미체결-취소-매도] 기존 매도 주문 + 추가 매수로 판단 → "
-                "해당 대출일자 미체결 주문 취소 후 재매도"
+                "[추가매수-미체결-매도-취소] 기존 매도 주문 + 추가 매수로 판단 → "
+                "해당 대출일자 미체결 주문 취소"
             )
 
             # 2-1) 해당 대출일자 미체결 주문 취소
             for order in related_orders:
                 logger.debug(
-                    f"[TEST-미체결-취소-매도] 미체결 신용매도주문 취소 : "
+                    f"[추가매수-미체결-매도-취소] 미체결 신용매도주문 취소 : "
                     f"{order.get('stk_nm', '')} / {order.get('ord_no', '')}"
                 )
                 self.trading.cancel_not_done_credit_sell_order(order)
-                sleep(0.2)
 
-            # 2-2) (필요 시) 잔고를 다시 조회해서 최신 가능수량 반영
-            # 여기서는 단순화를 위해 현재 available_num 을 사용
-            remain = available_num
-            if remain == 0:
-                logger.debug(
-                    "[TEST-미체결-취소-매도] 취소 후 가능수량이 0으로 변경되어 매도 주문 생략"
-                )
-                continue
-
-            remain = self._sell_credit_stock_with_default_config(
-                stock, remain, after_market=False
-            )
-
-            completed += 1
-            logger.info(
-                f"==================== TEST-미체결-취소-매도 (재매도) 진행 중... "
-                f"[{completed}/{total_stocks}] ===================="
-            )
-
-        logger.debug('>>>>>>>>>>> TEST-미체결-취소-매도 종료 <<<<<<<<<<<')
+        logger.debug('>>>>>>>>>>> 추가매수-미체결-매도-취소 종료 <<<<<<<<<<<')
 
 
 class ClearLocalOrderHistoryStrategy(TradingStrategy):
@@ -990,7 +940,7 @@ class TradingStrategyFactory:
         '101': GetUserCreditStocks,
         '200': SaveHoldingSummaryStrategy,
         '201': ClearLocalOrderHistoryStrategy,
-        '202': TestCancelUnfilledCreditSellStrategy,
+        '202': CancelUnfilledCreditSellStrategy,
     }
 
     @classmethod
