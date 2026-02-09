@@ -278,7 +278,7 @@ class KiwoomREST:
         resp = self._place_order("/api/dostk/ordr", "kt10000", data)
         if self._is_order_success(resp):
             # 성공 시: (True, 주문번호) 반환
-            return True, resp.get("output", {}).get("ord_no")
+            return True, resp.get("ord_no")
         else:
             # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
@@ -292,7 +292,7 @@ class KiwoomREST:
         resp = self._place_order("/api/dostk/ordr", "kt10001", data)
         if self._is_order_success(resp):
             # 성공 시: (True, 주문번호) 반환
-            return True, resp.get("output", {}).get("ord_no")
+            return True, resp.get("ord_no")
         else:
             # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
@@ -314,7 +314,7 @@ class KiwoomREST:
         resp = self._place_order(endpoint, api_id, data)
         if self._is_order_success(resp):
             # 성공 시: (True, 주문번호) 반환
-            return True, resp.get("output", {}).get("ord_no")
+            return True, resp.get("ord_no")
         else:
             # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
@@ -339,7 +339,7 @@ class KiwoomREST:
         resp = self._place_order(endpoint, api_id, data)
         if self._is_order_success(resp):
             # 성공 시: (True, 주문번호) 반환
-            return True, resp.get("output", {}).get("ord_no")
+            return True, resp.get("ord_no")
         else:
             # 실패 시: (False, 에러메시지) 반환
             return False, resp.get("return_msg", "주문 실패")
