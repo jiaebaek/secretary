@@ -1,4 +1,6 @@
 import argparse
+
+from telegram_bot import send_telegram_msg
 from trading_strategy import TradingStrategyFactory
 from utils import load_strategy_name
 from strategy_definitions import STRATEGY_NAME_TO_CODE
@@ -40,7 +42,7 @@ def main():
     if args.time:
         strategy_names = load_strategy_name(args.time)
         if not strategy_names:
-            logger.error(f"[main.py] {args.time}에 등록된 전략이 없습니다.")
+            logger.error(f"{args.time}에 등록된 전략이 없습니다.")
             return
 
         if isinstance(strategy_names, str):
@@ -50,14 +52,20 @@ def main():
             setup_logger_for_strategy(strategy_name)
             menu_code = STRATEGY_NAME_TO_CODE.get(strategy_name)
             if not menu_code:
-                logger.warning(f"[main.py] 전략명 '{strategy_name}'에 해당하는 코드가 없습니다.")
+                logger.warning(f"전략명 '{strategy_name}'에 해당하는 코드가 없습니다.")
                 continue
             try:
+                msg = f"[{strategy_name}] 시작"
+                send_telegram_msg(msg)  # 텔레그램 발송 추가
                 strategy = TradingStrategyFactory.create_strategy(menu_code)
                 strategy.execute({'trading_time': args.time})
-                logger.info(f"[main.py] 전략 {strategy_name}({menu_code}) 실행 완료")
+                msg = f"[{strategy_name}] 실행 완료"
+                logger.info(msg)
+                send_telegram_msg(msg)  # 텔레그램 발송 추가
             except Exception as e:
-                logger.exception(f"[main.py] 전략 {strategy_name} 실행 중 예외 발생: {e}")
+                err_msg = f"[{strategy_name}] 실행 중 예외 발생: {e}"
+                logger.exception(err_msg)
+                send_telegram_msg(err_msg)  # 텔레그램 발송 추가
                 continue
 
 if __name__ == '__main__':
