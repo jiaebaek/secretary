@@ -55,8 +55,6 @@ def main():
                 logger.warning(f"전략명 '{strategy_name}'에 해당하는 코드가 없습니다.")
                 continue
             try:
-                msg = f"[{strategy_name}] 시작"
-                send_telegram_msg(msg)  # 텔레그램 발송 추가
                 strategy = TradingStrategyFactory.create_strategy(menu_code)
                 strategy.execute({'trading_time': args.time})
                 msg = f"[{strategy_name}] 실행 완료"
