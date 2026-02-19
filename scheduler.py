@@ -5,6 +5,9 @@ from datetime import datetime
 import os
 import platform
 
+from telegram_bot import send_telegram_msg
+
+
 class StrategyScheduler:
     def __init__(self, config_path='strategy_config.json', terminal_mode=False):
         self.config_path = config_path
@@ -90,7 +93,10 @@ class StrategyScheduler:
     def run(self):
         mode_str = "터미널 모드" if self.terminal_mode else "백그라운드 모드"
         print(f'[Scheduler] 시작 ({mode_str}, OS: {self.system})')
-        self.log_scheduler_event(f'스케줄러 시작 - {mode_str}')
+        msg = f'스케줄러 시작 - {mode_str}'
+        send_telegram_msg(msg)  # 텔레그램 발송 추가
+        self.log_scheduler_event(msg)
+
         
         while True:
             now = datetime.now().strftime('%H:%M')

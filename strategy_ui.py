@@ -6,6 +6,7 @@ import time
 import re
 from strategy_definitions import STRATEGY_NAME_TO_CODE
 from config import LOG_FILE_PATH, ACCOUNT_OWNER_NAME
+from telegram_bot import send_telegram_msg
 
 
 st.set_page_config(layout="wide")
@@ -193,6 +194,9 @@ def main():
     st.title("📈 주식 매매 전략 관리 프로그램 (with secretary)")
     st.markdown(f"**👤 계좌 주인: `{ACCOUNT_OWNER_NAME}`**")
     config = load_strategy_config()
+
+    msg = f'주식 매매 전략 Dashboard 시작'
+    send_telegram_msg(msg)  # 텔레그램 발송 추가
 
     # 탭으로 구성 변경
     tab1, tab2, tab3 = st.tabs(["⚙️ 전략 설정", "⚡ 수동 실행", "📊 진행률 모니터링"])
