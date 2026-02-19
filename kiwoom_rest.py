@@ -1,4 +1,5 @@
 import json
+import random
 
 import requests
 import time
@@ -65,6 +66,10 @@ class KiwoomREST:
         cont_yn = 'N'
         next_key = ''
 
+        # 장 시작 직후(09:00~09:30)에는 타임아웃 시간을 더 길게 잡는 전략
+        # 혹은 기본 timeout을 60초로 상향 조정합니다.
+        current_timeout = 60
+
         while True:
             headers = {
                 "Content-Type": "application/json;charset=UTF-8",
@@ -82,61 +87,33 @@ class KiwoomREST:
 
             for attempt in range(max_retries):
                 try:
-                    resp = requests.post(url, headers=headers, json=data, timeout=30)
+                    # 1. Timeout 상향 조정 (30s -> 60s)
+                    resp = requests.post(url, headers=headers, json=data, timeout=current_timeout)
                     logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
-                    time.sleep(KIWOOM_API_INTERVAL)
+                    # 성공 시 로직 (기존과 동일)
+                    if resp.status_code == 200 and resp.text.strip():
+                        try:
+                            resp_json = resp.json()
+                            break
+                        except requests.exceptions.JSONDecodeError:
+                            raise  # 아래 retry 로직에서 처리됨
 
-                    # HTTP 상태 코드 확인
-                    if resp.status_code != 200:
-                        logger.warning(
-                            f"[KiwoomREST] HTTP {resp.status_code} on attempt {attempt + 1}: {resp.text[:200]}")
-                        if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            logger.error(f"[KiwoomREST] Final attempt failed with HTTP {resp.status_code}")
-                            resp.raise_for_status()
+                    # HTTP 에러 처리
+                    resp.raise_for_status()
 
-                    # 응답 내용 확인
-                    if not resp.text.strip():
-                        logger.warning(f"[KiwoomREST] Empty response on attempt {attempt + 1}")
-                        if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            logger.error("[KiwoomREST] Final attempt returned empty response")
-                            raise ValueError("Empty response from API")
 
-                    # JSON 파싱 시도
-                    try:
-                        resp_json = resp.json()
-                        # logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
-                        break  # 성공하면 루프 탈출
-                    except requests.exceptions.JSONDecodeError as e:
-                        logger.warning(f"[KiwoomREST] JSON decode error on attempt {attempt + 1}: {e}")
-                        logger.warning(f"[KiwoomREST] Response text: '{resp.text[:200]}...'")
-                        if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            logger.error(f"[KiwoomREST] Final attempt failed with JSON decode error: {e}")
-                            raise
-
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(f"[KiwoomREST] Connection error on attempt {attempt + 1}: {e}")
+                # 2. Timeout 및 주요 네트워크 에러 통합 처리
+                except (requests.exceptions.RequestException, TimeoutError) as e:
+                    logger.warning(f"[KiwoomREST] {type(e).__name__} on attempt {attempt + 1}: {e}")
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt
-                        logger.debug(f"[KiwoomREST] Retrying in {wait_time}s...")
+                        # 3. 지수 백오프 + 지터(Randomness) 추가
+                        # 모두가 동시에 재시도하면 서버가 더 힘들어하므로 약간의 랜덤성을 줍니다.
+                        wait_time = (2 ** attempt) + random.uniform(0, 1)
+                        logger.debug(f"[KiwoomREST] Retrying in {wait_time:.2f}s...")
                         time.sleep(wait_time)
                         continue
                     else:
-                        logger.error(f"[KiwoomREST] Max retries exceeded: {e}")
+                        logger.error(f"[KiwoomREST] Final attempt failed.")
                         raise
 
                 except Exception as e:
@@ -157,7 +134,11 @@ class KiwoomREST:
 
             cont_yn = resp.headers.get('cont-yn', 'N')
             next_key = resp.headers.get('next-key', '')
-            if cont_yn != 'Y':
+
+            # 연속 조회 사이에도 짧은 간격을 두어 서버 부하를 분산합니다.
+            if cont_yn == 'Y':
+                time.sleep(KIWOOM_API_INTERVAL)
+            else:
                 break
 
         return all_result if all_result is not None else {}
