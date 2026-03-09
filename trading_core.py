@@ -1145,10 +1145,10 @@ class Trading:
         hour = now_tupule.tm_hour
         minute = now_tupule.tm_min
         
-        # 8시 30분 이전: NXT
-        if hour < 8 or (hour == 8 and minute < 30):
+        # 8시 35분 이전: NXT
+        if hour < 8 or (hour == 8 and minute < 35):
             self.exchange = "NXT"
-        # 8시 30분부터 14시 59분까지: KRX
+        # 8시 35분부터 14시 59분까지: KRX
         elif hour < 15:
             self.exchange = "KRX"
         # 15시 00분 이후: NXT
