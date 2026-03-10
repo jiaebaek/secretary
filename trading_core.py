@@ -1148,10 +1148,10 @@ class Trading:
         # 8시 35분 이전: NXT
         if hour < 8 or (hour == 8 and minute < 35):
             self.exchange = "NXT"
-        # 8시 35분부터 14시 59분까지: KRX
-        elif hour < 15:
+        # 8시 35분부터 15시 9분까지: KRX
+        elif hour < 15 or (hour == 15 and minute < 10):
             self.exchange = "KRX"
-        # 15시 00분 이후: NXT
+        # 15시 10분 이후: NXT
         else:
             self.exchange = "NXT"
         logger.debug(f"거래소 : {self.exchange}")
