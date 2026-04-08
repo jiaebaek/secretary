@@ -5,6 +5,7 @@ import sqlite3
 from time import sleep
 import random
 import datetime
+import time
 from nxt_stock_list import NXT_STOCK_LIST
 
 # Constants moved from main.py
@@ -50,6 +51,7 @@ MAX_TRADING_DIFF = "당일매수매도차이금액"
 # Sleep intervals
 TR_REQ_TIME_INTERVAL = 0.3  # TR 요청 간격
 ORDER_SLEEP_INTERVAL = 0.4  # 주문 후 대기 시간
+HOLDING_BALANCE_CACHE_TTL_SEC = 480  # 일반/신용 연속 조회시 kt00018 중복호출 방지용
 
 ORDERTYPE = {'KRX매수': 1, 'KRX매도': 2, 'KRX매수취소': 3, 'KRX매도취소': 4,
              'SOR매수': 11, 'SOR매도': 12, 'SOR취소': 13, 'SOR정정': 15,
@@ -100,6 +102,24 @@ class Trading:
         self.rebuy_credit_stock_amount = 500000  # 기본값
         self.except_credit_rebuy_list = []
         self.max_trading_diff = 30000000  # 기본값 설정
+        self._holding_balance_cache = {}
+
+    def _get_shared_holding_balance(self, market):
+        """
+        일반/신용 잔고 조회에서 공통으로 사용하는 kt00018 응답 캐시.
+        - 아주 짧은 TTL만 사용해 같은 실행 흐름의 중복 호출만 제거.
+        """
+        now = time.monotonic()
+        cache = self._holding_balance_cache.get(market)
+        if cache and now - cache['fetched_at'] <= HOLDING_BALANCE_CACHE_TTL_SEC:
+            return cache['result']
+
+        result = self.kiwoom.get_balance(qry_tp='2', dmst_stex_tp=market, include_credit=True)
+        self._holding_balance_cache[market] = {
+            'fetched_at': now,
+            'result': result,
+        }
+        return result
 
     def update_options(self):
         conn = sqlite3.connect(DB_PATH)
@@ -255,8 +275,10 @@ class Trading:
     def get_user_stock(self, after_market=False):
         # 잔고조회 (REST)
         market = "KRX" if after_market else self.exchange
-        result = self.kiwoom.get_balance(qry_tp='1', dmst_stex_tp=market)
-        self.user_stock_list = result.get('acnt_evlt_remn_indv_tot', [])
+        # kt00018 공통 스냅샷에서 일반(현금) 종목만 사용
+        result = self._get_shared_holding_balance(market)
+        all_stocks = result.get('acnt_evlt_remn_indv_tot', [])
+        self.user_stock_list = [stock for stock in all_stocks if "*" not in stock.get('name', '')]
         self.user_stock_num = len(self.user_stock_list)
         logger.debug(f'user stock cnt : {self.user_stock_num}')
         logger.debug(self.user_stock_list)
@@ -271,7 +293,8 @@ class Trading:
         self.user_credit_stock_list = result_eval.get('stk_acnt_evlt_prst', [])
 
         # 2) 신용잔고 상세 (대출일별 보유수량/매도가능수량 포함)
-        result = self.kiwoom.get_balance(qry_tp='2', dmst_stex_tp=market, include_credit=True)
+        #    get_user_stock 와 공통 스냅샷 사용 -> kt00018 중복호출 방지
+        result = self._get_shared_holding_balance(market)
         balance_list = result.get('acnt_evlt_remn_indv_tot', [])
 
         # 3) (종목명 + 대출일) 로 매핑
