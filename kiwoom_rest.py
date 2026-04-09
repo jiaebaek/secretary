@@ -94,13 +94,13 @@ class KiwoomREST:
                     if resp.status_code == 200 and resp.text.strip():
                         try:
                             resp_json = resp.json()
+                            # logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
                             break
                         except requests.exceptions.JSONDecodeError:
                             raise  # 아래 retry 로직에서 처리됨
 
                     # HTTP 에러 처리
                     resp.raise_for_status()
-
 
                 # 2. Timeout 및 주요 네트워크 에러 통합 처리
                 except (requests.exceptions.RequestException, TimeoutError) as e:
@@ -508,7 +508,6 @@ class KiwoomREST:
             "dmst_stex_tp": dmst_stex_tp
         }
         result = self.request_with_continuation(endpoint, api_id, data, 'stk_acnt_evlt_prst')
-        logger.debug(result)
 
         # 신용 종목 필터링 및 매핑
         if 'stk_acnt_evlt_prst' in result:
