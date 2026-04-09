@@ -508,6 +508,7 @@ class KiwoomREST:
             "dmst_stex_tp": dmst_stex_tp
         }
         result = self.request_with_continuation(endpoint, api_id, data, 'stk_acnt_evlt_prst')
+        logger.debug(result)
 
         # 신용 종목 필터링 및 매핑
         if 'stk_acnt_evlt_prst' in result:
