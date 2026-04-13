@@ -484,6 +484,15 @@ class Trading:
         if price == 0:
             logger.error(f"매수 주문 실패: 현재가 정보 없음")
             return False
+
+        unit = 1000
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit)
+        price = int(price * unit)
+
         num = int(amount / price) if amount else 1
         if buy_amount and (buy_amount + (num * price) > self.max_amount):
             num = int((self.max_amount - buy_amount) / price)
@@ -510,6 +519,14 @@ class Trading:
         if price == 0:
             logger.error(f"매수 주문 실패: 현재가 정보 없음")
             return False
+
+        unit = 1000
+        for pr, un in HOGAUNIT.items():
+            if price < pr:
+                unit = un
+                break
+        price = int(price / unit)
+        price = int(price * unit)
 
         num = int(amount / price) if amount else 1
 
