@@ -291,11 +291,21 @@ class Trading:
         # 1) 신용잔고 평가 조회
         result_eval = self.kiwoom.get_account_evaluation(qry_tp='0', dmst_stex_tp=market)
         self.user_credit_stock_list = result_eval.get('stk_acnt_evlt_prst', [])
+        account_eval_call_count = result_eval.get('_api_call_count', 0)
 
         # 2) 신용잔고 상세 (대출일별 보유수량/매도가능수량 포함)
         #    get_user_stock 와 공통 스냅샷 사용 -> kt00018 중복호출 방지
         result = self._get_shared_holding_balance(market)
         balance_list = result.get('acnt_evlt_remn_indv_tot', [])
+        balance_call_count = result.get('_api_call_count', 0)
+
+        if account_eval_call_count != balance_call_count:
+            error_msg = (
+                f"[ERROR] 신용잔고 조회 API 호출 횟수 불일치: "
+                f"account_evaluation={account_eval_call_count}, balance={balance_call_count}"
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
         # 3) (종목명 + 대출일) 로 매핑
         balance_map = {

@@ -31,7 +31,7 @@ class TradingStrategy(ABC):
 
     def get_user_stock(self, after_market=False):
         """Get user's stock information"""
-        logger.debug('주식정보 가져오기')
+        logger.info('주식정보 가져오기')
         self.user_stock_list = self.trading.get_user_stock(after_market)
         if not self.user_stock_list:
             raise Exception('주식 보유 없음')
@@ -40,7 +40,7 @@ class TradingStrategy(ABC):
 
     def get_user_credit_stock(self, after_market=False):
         """Get user's credit stock information"""
-        logger.debug('신용주식정보 가져오기')
+        logger.info('신용주식정보 가져오기')
         self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
         if not self.user_credit_stock_list:
             raise Exception('주식 보유 없음')
@@ -48,7 +48,7 @@ class TradingStrategy(ABC):
 
     def _sell_all_stocks(self):
         """Sell all stocks in the given list according to configured sell rates"""
-        logger.debug('>>>>>>>>>>> 현금주식 매도 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 현금주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
         for stock in self.user_stock_list:
@@ -64,7 +64,7 @@ class TradingStrategy(ABC):
                                                       self.trading.sell_stock_amount[i])
             completed += 1
             logger.info(f"==================== 현금주식 매도 진행 중... [{completed}/{total_stocks}] ====================")
-            logger.debug("남은 주식 수 : {}".format(remain))
+            logger.info("남은 주식 수 : {}".format(remain))
 
     def _sell_credit_stock_with_default_config(self, stock, remain: int, after_market: bool = False) -> int:
         """
@@ -88,7 +88,7 @@ class TradingStrategy(ABC):
         return remain
 
     def _sell_all_credit_stocks(self):
-        logger.debug('>>>>>>>>>>> 신용주식 매도 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 신용주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_credit_stock_list)
         completed = 0
         for stock in self.user_credit_stock_list:
@@ -98,10 +98,10 @@ class TradingStrategy(ABC):
             remain = self._sell_credit_stock_with_default_config(stock, remain, after_market=False)
             completed += 1
             logger.info(f"==================== 신용주식 매도 진행 중... [{completed}/{total_stocks}] ====================")
-            logger.debug("남은 주식 수 : {}".format(remain))
+            logger.info("남은 주식 수 : {}".format(remain))
 
     def _sell_all_credit_stocks_finish_market(self):
-        logger.debug('>>>>>>>>>>> 신용주식 매도 (장마감전 정리용) <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 신용주식 매도 (장마감전 정리용) <<<<<<<<<<<')
         total_stocks = len(self.user_credit_stock_list)
         completed = 0
         for stock in self.user_credit_stock_list:
@@ -121,11 +121,11 @@ class TradingStrategy(ABC):
                                                              after_market=False)
             completed += 1
             logger.info(f"==================== 신용주식 장마감전 매도 진행 중... [{completed}/{total_stocks}] ====================")
-            logger.debug("남은 주식 수 : {}".format(remain))
+            logger.info("남은 주식 수 : {}".format(remain))
 
     def _sell_all_stocks_after_market(self):
         """Sell all stocks in the given list according to configured sell rates"""
-        logger.debug('>>>>>>>>>>> 현금주식 시간외 매도 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 현금주식 시간외 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
 
@@ -139,11 +139,11 @@ class TradingStrategy(ABC):
                                                   self.trading.sell_stock_amount[1], after_market=True)
             completed += 1
             logger.info(f"==================== 현금주식 시간외 매도 진행 중... [{completed}/{total_stocks}] ====================")
-            logger.debug("남은 주식 수 : {}".format(remain))
+            logger.info("남은 주식 수 : {}".format(remain))
 
     def _sell_all_credit_stocks_after_market(self):
         """Sell all credit stocks in the given list according to configured sell rates"""
-        logger.debug('>>>>>>>>>>> 신용주식 시간외 매도 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 신용주식 시간외 매도 <<<<<<<<<<<')
         total_credit_stocks = len(self.user_credit_stock_list)
         completed_credit = 0
 
@@ -167,111 +167,111 @@ class TradingStrategy(ABC):
                 f"==================== 신용주식 시간외 매도 진행 중... [{completed_credit}/{total_credit_stocks}] ====================")
 
     def _cancel_buy_order_krx(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금매수(KRX) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금매수(KRX) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_order()
         for order in self.trading.not_done_orders:
             if "신용" not in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
-                logger.debug(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_buy_order_nxt(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금매수(NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금매수(NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_order()
         for order in self.trading.not_done_orders:
             if "신용" not in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
-                logger.debug(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 현금매수주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_credit_buy_order_krx(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매수(KRX) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매수(KRX) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_order()
         for order in self.trading.not_done_orders:
             if "신용" in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
-                logger.debug(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_credit_buy_order_nxt(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매수(NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매수(NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_order()
         for order in self.trading.not_done_orders:
             if "신용" in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
-                logger.debug(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매수주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_all_buy_order(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금신용매수(KRX/NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금신용매수(KRX/NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_order()
         for order in self.trading.not_done_orders:
-            logger.debug(f"미체결 매수주문 : {order['stk_nm']} / {order['ord_no']}")
+            logger.info(f"미체결 매수주문 : {order['stk_nm']} / {order['ord_no']}")
             if "신용" in order['io_tp_nm']:
                 self.trading.cancel_not_done_credit_sell_order(order)
             else:
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_sell_order_krx(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금매도(KRX) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금매도(KRX) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" not in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
-                logger.debug(f"미체결 주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_sell_order_nxt(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금매도(NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금매도(NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" not in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
-                logger.debug(f"미체결 주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_credit_sell_order_krx(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(KRX) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매도(KRX) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['io_tp_nm'] and "KRX" in order['stex_tp_txt']:
-                logger.debug(f"미체결 신용매도주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매도주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_credit_sell_order_nxt(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매도(NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['io_tp_nm'] and "NXT" in order['stex_tp_txt']:
-                logger.debug(f"미체결 신용매도주문 : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매도주문 : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_credit_sell_order(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            logger.debug(f"미체결 매도주문 : {order['stk_nm']} / {order['ord_no']}")
+            logger.info(f"미체결 매도주문 : {order['stk_nm']} / {order['ord_no']}")
             if "신용" in order['io_tp_nm']:
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_all_sell_order(self):
-        logger.debug('>>>>>>>>>>> 미체결 현금신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 현금신용매도(KRX/NXT) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
-            logger.debug(f"미체결 매도주문 : {order['stk_nm']} / {order['ord_no']}")
+            logger.info(f"미체결 매도주문 : {order['stk_nm']} / {order['ord_no']}")
             if "신용" in order['io_tp_nm']:
                 self.trading.cancel_not_done_credit_sell_order(order)
             else:
                 self.trading.cancel_not_done_sell_order(order)
 
     def _cancel_credit_sell_order_not_nxt_stock(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(NOT NXT 종목) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매도(NOT NXT 종목) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['io_tp_nm'] and order['stk_cd'] not in NXT_STOCK_LIST:
-                logger.debug(f"미체결 신용매도주문(NOT NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매도주문(NOT NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
     def _cancel_credit_sell_order_nxt_stock(self):
-        logger.debug('>>>>>>>>>>> 미체결 신용매도(NXT 종목) 주문 취소 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 미체결 신용매도(NXT 종목) 주문 취소 <<<<<<<<<<<')
         self.trading.get_not_done_sell()
         for order in self.trading.not_done_sell:
             if "신용" in order['io_tp_nm'] and order['stk_cd'] in NXT_STOCK_LIST:
-                logger.debug(f"미체결 신용매도주문(NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
+                logger.info(f"미체결 신용매도주문(NXT 종목) : {order['stk_nm']} / {order['ord_no']}")
                 self.trading.cancel_not_done_credit_sell_order(order)
 
 class AutoBothSellingStrategy(TradingStrategy):
@@ -295,9 +295,9 @@ class AutoAveragingDownStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
         self.get_user_stock()
-        logger.debug('>>>>>>>>>>> 현금주식 추가 매수 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 현금주식 추가 매수 <<<<<<<<<<<')
         self.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-        logger.debug('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
+        logger.info('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
 
         total_stocks = len(self.user_stock_list)
         completed = 0
@@ -306,14 +306,14 @@ class AutoAveragingDownStrategy(TradingStrategy):
             stock = self.user_stock_list[i]
             buy_amount = int(stock['buy_amount'])
             if buy_amount > self.trading.max_amount:
-                logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
+                logger.info("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
                                                                                    self.trading.max_amount))
                 continue
             if not self.user_stock_list[i]['name'] in self.trading.except_rebuy_list:
                 self.trading.rebuy_user_stock(stock)
                 self.trading.rebuy_1_stock(stock)
             else:
-                logger.debug("물타기 제외 종목입니다 : {}".format(stock))
+                logger.info("물타기 제외 종목입니다 : {}".format(stock))
 
             completed += 1
             logger.info(f"==================== 물타기 매수 진행 중... [{completed}/{total_stocks}] ====================")
@@ -338,7 +338,7 @@ class AutoNewBuyingStrategy(TradingStrategy):
         if self.trading.new_buy_stock:
             self.trading.get_not_done_order()
 
-            logger.debug('>>>>>>>>>>>> 현금주식 신규 매수 <<<<<<<<<<<<<<')
+            logger.info('>>>>>>>>>>>> 현금주식 신규 매수 <<<<<<<<<<<<<<')
             self.trading.set_buy_stock_num()
             self.trading.buy_new_stock()
 
@@ -351,7 +351,7 @@ class ManualSellingStrategy(TradingStrategy):
         self.get_user_stock()
         earning_rate = config.get('earning_rate')
         num = config.get('num')
-        logger.debug('>>>>>>>>>>> 수동 설정 현금주식 매도 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 수동 설정 현금주식 매도 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
 
@@ -369,10 +369,10 @@ class ManualAveragingDownStrategy(TradingStrategy):
         self.log_window = config.get('log_window')
         self.get_user_stock()
         self.user_stock_list.sort(key=lambda stock: float(stock["earning_rate"]))
-        logger.debug('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
+        logger.info('물타기 제외 종목 들 : {}'.format(self.trading.except_rebuy_list))
         earning_rate = config.get('earning_rate')
         num = config.get('num')
-        logger.debug('>>>>>>>>>>> 수동 설정 현금주식 물타기 매수 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 수동 설정 현금주식 물타기 매수 <<<<<<<<<<<')
         total_stocks = len(self.user_stock_list)
         completed = 0
 
@@ -381,13 +381,13 @@ class ManualAveragingDownStrategy(TradingStrategy):
             stock = self.user_stock_list[i]
             buy_amount = int(stock['buy_amount'])
             if buy_amount > self.trading.max_amount:
-                logger.debug("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
+                logger.info("------- 종목명 : {} 보유금액({}원)이 MAX 값({})보다 큽니다.".format(stock['name'], buy_amount,
                                                                                    self.trading.max_amount))
                 continue
             if not self.user_stock_list[i]['name'] in self.trading.except_rebuy_list:
                 self.trading.rebuy_manual_stock(stock, earning_rate, num)
             else:
-                logger.debug("물타기 제외 종목입니다 : {}".format(stock))
+                logger.info("물타기 제외 종목입니다 : {}".format(stock))
             completed += 1
             logger.info(f"==================== 수동 물타기 매수 진행 중... [{completed}/{total_stocks}] ====================")
 
@@ -411,7 +411,7 @@ class AutoCreditBuyingStrategy(TradingStrategy):
         current_diff = self.trading.get_today_trading_diff()
         limit_diff = self.trading.max_trading_diff
 
-        logger.debug(f"매수-매도 차이 체크: {current_diff}원 (기준: {limit_diff}원)")
+        logger.info(f"매수-매도 차이 체크: {current_diff}원 (기준: {limit_diff}원)")
 
         # 2. 매수금액 - 매도금액이 기준보다 크면 매수 중단
         if current_diff >= limit_diff:
@@ -419,7 +419,7 @@ class AutoCreditBuyingStrategy(TradingStrategy):
             return
 
         # 3. 기준 이내일 경우 기존 매수 로직 수행
-        logger.debug('>>>>>>>>>>>> 매수 조건 충족: 신용주식 신규 매수 진행 <<<<<<<<<<<<<<')
+        logger.info('>>>>>>>>>>>> 매수 조건 충족: 신용주식 신규 매수 진행 <<<<<<<<<<<<<<')
         self.trading.get_interesting_stock()
         self.get_user_credit_stock()
         self.get_user_stock()
@@ -435,8 +435,8 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
         self.get_user_credit_stock()
         self.get_user_stock()  # TODO: 임시 제거 검증후 다시 추가
 
-        logger.debug('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
-        logger.debug('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
+        logger.info('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
+        logger.info('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
 
         # 현금 주식과 신용 주식을 합쳐서 동일 종목 중 가장 최근 매수(신용 우선)를 선택하고,
         # 현금+신용 보유금액 합계로 MAX 한도를 체크합니다.
@@ -475,7 +475,7 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
 
             # 현금/신용 전체 보유금액이 MAX 한도 이상이면 물타기 제외
             if total_buy_amount >= self.trading.max_amount:
-                logger.debug(
+                logger.info(
                     f"--- [제한] {stock['name']}: 현금+신용 보유액 합계({total_buy_amount})이 "
                     f"MAX({self.trading.max_amount}) 이상으로 물타기 제외"
                 )
@@ -488,7 +488,7 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
                     f"==================== 신용 물타기 매수 진행 중... [{completed}/{total_stocks}] ===================="
                 )
             else:
-                logger.debug(f"신용 물타기 제외 종목입니다 : {stock}")
+                logger.info(f"신용 물타기 제외 종목입니다 : {stock}")
 
 
 class AutoAfterMarketNXTTradingStrategy(TradingStrategy):
@@ -566,7 +566,7 @@ class AutoCreditSellingLoopStrategy(TradingStrategy):
         while True:
             self.get_user_credit_stock()
             self._sell_all_credit_stocks()
-            logger.debug('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
+            logger.info('>>>>>>>>>>> 신용주식 매도 주문 완료, 다음 매도를 위해 대기중... <<<<<<<<<<<')
 
 
 class CancelSellOrderKRXStrategy(TradingStrategy):
@@ -691,7 +691,7 @@ class SaveHoldingSummaryStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
 
-        logger.debug('>>>>>>>>>>> 잔고 내역 저장 (일반+신용 보유금액 합산) 시작 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 잔고 내역 저장 (일반+신용 보유금액 합산) 시작 <<<<<<<<<<<')
 
         # REST 를 통해 현재 잔고 조회 (예외를 피하기 위해 Trading 인스턴스의 메서드를 직접 사용)
         cash_stocks = self.trading.get_user_stock()
@@ -786,7 +786,7 @@ class CancelUnfilledCreditSellStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-        logger.debug('>>>>>>>>>>> 추가매수-미체결-매도-취소 시작 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 추가매수-미체결-매도-취소 시작 <<<<<<<<<<<')
 
         # 1) 현재 신용잔고 조회 (보유수량/가능수량/대출일자 포함)
         self.get_user_credit_stock()
@@ -837,39 +837,39 @@ class CancelUnfilledCreditSellStrategy(TradingStrategy):
             except (TypeError, ValueError):
                 available_num = 0
 
-            logger.debug(
+            logger.info(
                 f"[추가매수-미체결-매도-취소] 종목:{name}, 대출일자:{loan_date}, "
                 f"보유수량:{possession_num}, 가능수량:{available_num}"
             )
 
             # 가능수량이 0이면 매도 주문 스킵
             if available_num == 0:
-                logger.debug("[추가매수-미체결-매도-취소] 가능수량이 0이므로 미체결 주문 확인 스킵")
+                logger.info("[추가매수-미체결-매도-취소] 가능수량이 0이므로 미체결 주문 확인 스킵")
                 continue
 
             # 보유수량 == 가능수량 이면 (추가 매수 없다고 보고) 취소 로직 스킵
             if possession_num == available_num:
-                logger.debug("[추가매수-미체결-매도-취소] 보유수량 == 가능수량 → 추가 매수 없음으로 판단, 취소 스킵")
+                logger.info("[추가매수-미체결-매도-취소] 보유수량 == 가능수량 → 추가 매수 없음으로 판단, 취소 스킵")
                 continue
 
             key = (name, loan_date)
             related_orders = credit_orders_by_key.get(key, [])
 
             # Case 2) 가능수량 != 0 이고 보유수량 != 가능수량 → 기존 매도 주문 + 추가 매수 발생
-            logger.debug(
+            logger.info(
                 "[추가매수-미체결-매도-취소] 기존 매도 주문 + 추가 매수로 판단 → "
                 "해당 대출일자 미체결 주문 취소"
             )
 
             # 2-1) 해당 대출일자 미체결 주문 취소
             for order in related_orders:
-                logger.debug(
+                logger.info(
                     f"[추가매수-미체결-매도-취소] 미체결 신용매도주문 취소 : "
                     f"{order.get('stk_nm', '')} / {order.get('ord_no', '')}"
                 )
                 self.trading.cancel_not_done_credit_sell_order(order)
 
-        logger.debug('>>>>>>>>>>> 추가매수-미체결-매도-취소 종료 <<<<<<<<<<<')
+        logger.info('>>>>>>>>>>> 추가매수-미체결-매도-취소 종료 <<<<<<<<<<<')
 
 
 class ClearLocalOrderHistoryStrategy(TradingStrategy):
@@ -878,7 +878,7 @@ class ClearLocalOrderHistoryStrategy(TradingStrategy):
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
 
-        logger.debug(">>>>>>>>>>> local_order_history 전체 삭제 시작 <<<<<<<<<<<")
+        logger.info(">>>>>>>>>>> local_order_history 전체 삭제 시작 <<<<<<<<<<<")
 
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()

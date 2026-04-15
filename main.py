@@ -16,13 +16,14 @@ def setup_logger_for_strategy(strategy_name):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file_path = os.path.join(LOG_FILE_PATH, f"{timestamp}_{safe_strategy}.log")
     file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s > %(message)s')
     file_handler.setFormatter(formatter)
     logger.handlers = []  # 기존 핸들러 제거
     logger.addHandler(file_handler)
     # (선택) 콘솔 핸들러도 추가
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 

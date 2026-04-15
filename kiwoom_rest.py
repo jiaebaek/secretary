@@ -42,7 +42,7 @@ class KiwoomREST:
             try:
                 resp = requests.post(url, headers=headers, json=data, timeout=30)
                 time.sleep(KIWOOM_API_INTERVAL)
-                logger.debug(f"[KiwoomREST] API CALL: url={url}, data={data}")
+                logger.info(f"[KiwoomREST] API CALL: url={url}, data={data}")
                 resp_json = resp.json()
                 logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
                 return resp_json
@@ -65,6 +65,7 @@ class KiwoomREST:
         all_result = None
         cont_yn = 'N'
         next_key = ''
+        api_call_count = 0
 
         # 장 시작 직후(09:00~09:30)에는 타임아웃 시간을 더 길게 잡는 전략
         # 혹은 기본 timeout을 60초로 상향 조정합니다.
@@ -89,12 +90,12 @@ class KiwoomREST:
                 try:
                     # 1. Timeout 상향 조정 (30s -> 60s)
                     resp = requests.post(url, headers=headers, json=data, timeout=current_timeout)
-                    logger.debug(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
+                    logger.info(f"[KiwoomREST] API CALL: endpoint={endpoint}, api_id={api_id}, data={data}")
                     # 성공 시 로직 (기존과 동일)
                     if resp.status_code == 200 and resp.text.strip():
                         try:
                             resp_json = resp.json()
-                            # logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
+                            logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
                             break
                         except requests.exceptions.JSONDecodeError:
                             raise  # 아래 retry 로직에서 처리됨
@@ -122,6 +123,7 @@ class KiwoomREST:
 
             if resp_json is None:
                 break
+            api_call_count += 1
 
             # 결과 누적
             if all_result is None:
@@ -140,8 +142,10 @@ class KiwoomREST:
                 time.sleep(KIWOOM_API_INTERVAL)
             else:
                 break
-
-        return all_result if all_result is not None else {}
+        if all_result is not None:
+            all_result['_api_call_count'] = api_call_count
+            return all_result
+        return {'_api_call_count': api_call_count}
 
     def request(self, endpoint, api_id, data=None):
         self.ensure_token()
