@@ -46,6 +46,69 @@ class TradingStrategy(ABC):
             raise Exception('주식 보유 없음')
         self.user_credit_stock_num = len(self.user_credit_stock_list)
 
+    def _can_run_credit_new_buy(self) -> bool:
+        """신규 신용매수 가능 여부(당일 매수/매도 차이 기준)"""
+        current_diff = self.trading.get_today_trading_diff()
+        limit_diff = self.trading.max_trading_diff
+        logger.info(f"매수-매도 차이 체크: {current_diff}원 (기준: {limit_diff}원)")
+        if current_diff >= limit_diff:
+            logger.info(f"!!! 신규 매수 제한: 당일 매수-매도 차이({current_diff}원)가 기준({limit_diff}원)을 초과함")
+            return False
+        return True
+
+    def _execute_credit_new_buy(self) -> None:
+        """신규 신용매수 실행"""
+        logger.info('>>>>>>>>>>>> 매수 조건 충족: 신용주식 신규 매수 진행 <<<<<<<<<<<<<<')
+        self.trading.get_interesting_stock()
+        self.trading.buy_new_credit_stock()
+
+    def _execute_credit_averaging_down(self) -> None:
+        """신용 물타기 공통 로직"""
+        logger.info('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
+        logger.info('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
+
+        # 현금 주식과 신용 주식을 합쳐서 동일 종목 중 가장 최근 매수(신용 우선)를 선택하고,
+        # 현금+신용 보유금액 합계로 MAX 한도를 체크합니다.
+        all_holdings = self.user_credit_stock_list + self.user_stock_list
+        latest_stocks = {}
+        total_buy_amount_by_name = {}
+
+        for stock in all_holdings:
+            name = stock['name'].lstrip('*')
+            loan_date = stock.get("loan_date", "")
+            buy_amount = int(stock.get('buy_amount', 0))
+
+            if name not in latest_stocks:
+                latest_stocks[name] = stock
+            elif loan_date > latest_stocks[name].get("loan_date", ""):
+                latest_stocks[name] = stock
+
+            total_buy_amount_by_name[name] = total_buy_amount_by_name.get(name, 0) + buy_amount
+
+        total_stocks = len(latest_stocks)
+        completed = 0
+
+        for stock in latest_stocks.values():
+            is_cash_stock = stock.get("loan_date", "") == ""
+            name = stock['name'].lstrip('*')
+            total_buy_amount = int(total_buy_amount_by_name.get(name, 0))
+
+            if total_buy_amount >= self.trading.max_amount:
+                logger.info(
+                    f"--- [제한] {stock['name']}: 현금+신용 보유액 합계({total_buy_amount})이 "
+                    f"MAX({self.trading.max_amount}) 이상으로 물타기 제외"
+                )
+                continue
+
+            if stock['name'] not in self.trading.except_credit_rebuy_list:
+                self.trading.rebuy_user_credit_stock(stock, is_cash_stock=is_cash_stock)
+                completed += 1
+                logger.info(
+                    f"==================== 신용 물타기 매수 진행 중... [{completed}/{total_stocks}] ===================="
+                )
+            else:
+                logger.info(f"신용 물타기 제외 종목입니다 : {stock}")
+
     def _sell_all_stocks(self):
         """Sell all stocks in the given list according to configured sell rates"""
         logger.info('>>>>>>>>>>> 현금주식 매도 <<<<<<<<<<<')
@@ -406,25 +469,12 @@ class AutoCreditBuyingStrategy(TradingStrategy):
 
     def execute(self, config: Dict[str, Any]) -> None:
         self.log_window = config.get('log_window')
-
-        # 1. 당일 매수/매도 차이 금액 확인
-        current_diff = self.trading.get_today_trading_diff()
-        limit_diff = self.trading.max_trading_diff
-
-        logger.info(f"매수-매도 차이 체크: {current_diff}원 (기준: {limit_diff}원)")
-
-        # 2. 매수금액 - 매도금액이 기준보다 크면 매수 중단
-        if current_diff >= limit_diff:
-            logger.info(f"!!! 신규 매수 제한: 당일 매수-매도 차이({current_diff}원)가 기준({limit_diff}원)을 초과함")
+        if not self._can_run_credit_new_buy():
             return
 
-        # 3. 기준 이내일 경우 기존 매수 로직 수행
-        logger.info('>>>>>>>>>>>> 매수 조건 충족: 신용주식 신규 매수 진행 <<<<<<<<<<<<<<')
-        self.trading.get_interesting_stock()
         self.get_user_credit_stock()
         self.get_user_stock()
-
-        self.trading.buy_new_credit_stock()
+        self._execute_credit_new_buy()
 
 
 class AutoCreditAveragingDownStrategy(TradingStrategy):
@@ -434,61 +484,21 @@ class AutoCreditAveragingDownStrategy(TradingStrategy):
         self.log_window = config.get('log_window')
         self.get_user_credit_stock()
         self.get_user_stock()  # TODO: 임시 제거 검증후 다시 추가
+        self._execute_credit_averaging_down()
 
-        logger.info('>>>>>>>>>>> 신용주식 추가 매수 (물타기) <<<<<<<<<<<')
-        logger.info('신용 물타기 제외 종목 : {}'.format(self.trading.except_credit_rebuy_list))
 
-        # 현금 주식과 신용 주식을 합쳐서 동일 종목 중 가장 최근 매수(신용 우선)를 선택하고,
-        # 현금+신용 보유금액 합계로 MAX 한도를 체크합니다.
-        all_holdings = self.user_credit_stock_list + self.user_stock_list
+class AutoCreditCombinedBuyingStrategy(TradingStrategy):
+    """Strategy for menu '13-14': 장중-신용-신규매수+물타기-매수"""
 
-        # 1) 동일 종목 중 가장 최근 매수(신용 우선) 정보
-        latest_stocks = {}
-        # 2) 동일 종목의 현금+신용 보유금액 합계
-        total_buy_amount_by_name = {}
+    def execute(self, config: Dict[str, Any]) -> None:
+        self.log_window = config.get('log_window')
+        self.get_user_credit_stock()
+        self.get_user_stock()
 
-        for stock in all_holdings:
-            name = stock['name'].lstrip('*')
-            loan_date = stock.get("loan_date", "")  # 현금 주식은 빈 문자열
-            buy_amount = int(stock.get('buy_amount', 0))
-
-            # 최신(대출일 기준) 보유 정보 저장
-            if name not in latest_stocks:
-                latest_stocks[name] = stock
-            else:
-                # 대출일(loan_date)이 더 최근인 것을 우선순위로 둡니다.
-                if loan_date > latest_stocks[name].get("loan_date", ""):
-                    latest_stocks[name] = stock
-
-            # 종목별 전체 보유금액(현금+신용) 합산
-            total_buy_amount_by_name[name] = total_buy_amount_by_name.get(name, 0) + buy_amount
-
-        # 전체 종목 수
-        total_stocks = len(latest_stocks)
-        completed = 0
-
-        for stock in latest_stocks.values():
-            # 현금주식 여부 판별 (대출일이 없으면 현금주식)
-            is_cash_stock = stock.get("loan_date", "") == ""
-            name = stock['name'].lstrip('*')
-            total_buy_amount = int(total_buy_amount_by_name.get(name, 0))
-
-            # 현금/신용 전체 보유금액이 MAX 한도 이상이면 물타기 제외
-            if total_buy_amount >= self.trading.max_amount:
-                logger.info(
-                    f"--- [제한] {stock['name']}: 현금+신용 보유액 합계({total_buy_amount})이 "
-                    f"MAX({self.trading.max_amount}) 이상으로 물타기 제외"
-                )
-                continue
-
-            if stock['name'] not in self.trading.except_credit_rebuy_list:
-                self.trading.rebuy_user_credit_stock(stock, is_cash_stock=is_cash_stock)
-                completed += 1
-                logger.info(
-                    f"==================== 신용 물타기 매수 진행 중... [{completed}/{total_stocks}] ===================="
-                )
-            else:
-                logger.info(f"신용 물타기 제외 종목입니다 : {stock}")
+        self._execute_credit_averaging_down()
+        allow_new_buy = self._can_run_credit_new_buy()
+        if allow_new_buy:
+            self._execute_credit_new_buy()
 
 
 class AutoAfterMarketNXTTradingStrategy(TradingStrategy):
@@ -919,6 +929,7 @@ class TradingStrategyFactory:
         '12-1': AutoCreditSellingLoopStrategy,
         '13': AutoCreditBuyingStrategy,
         '14': AutoCreditAveragingDownStrategy,
+        '13-14': AutoCreditCombinedBuyingStrategy,
         '16': AutoAfterMarketNXTTradingStrategy,
         '17': AutoCreditAfterMarketStrategy,
         '18': AutoCreditBeforeFinishMarketSellingStrategy,
