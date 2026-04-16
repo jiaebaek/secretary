@@ -44,7 +44,7 @@ class KiwoomREST:
                 time.sleep(KIWOOM_API_INTERVAL)
                 logger.info(f"[KiwoomREST] API CALL: url={url}, data={data}")
                 resp_json = resp.json()
-                logger.debug(f"[KiwoomREST] API RESP: {resp_json}")
+                logger.info(f"[KiwoomREST] API RESP: {resp_json}")
                 return resp_json
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, json.JSONDecodeError) as e:
                 if attempt < max_retries - 1:
