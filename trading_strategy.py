@@ -30,21 +30,57 @@ class TradingStrategy(ABC):
         pass
 
     def get_user_stock(self, after_market=False):
-        """Get user's stock information"""
-        logger.info('주식정보 가져오기')
-        self.user_stock_list = self.trading.get_user_stock(after_market)
-        if not self.user_stock_list:
-            raise Exception('주식 보유 없음')
+        """Get user's stock information with one retry"""
+        logger.info('주식정보 가져오기 시작')
+        
+        try:
+            # 1차 시도
+            self.user_stock_list = self.trading.get_user_stock(after_market)
+            
+            if not self.user_stock_list:
+                raise Exception('주식 보유 데이터 없음')
+                
+        except Exception as e:
+            # 첫 번째 실패 시 재시도 로직
+            logger.warning(f'1차 시도 실패 ({e}): 재시도를 진행합니다.')
+            
+            # 2차 시도 (마지막 시도)
+            self.user_stock_list = self.trading.get_user_stock(after_market)
+            
+            if not self.user_stock_list:
+                logger.error('2차 시도 결과: 주식 보유 데이터가 여전히 없습니다.')
+                raise Exception('주식 보유 없음 (재시도 후에도 데이터가 없음)')
 
+        # 성공 시 개수 업데이트
         self.user_stock_num = len(self.user_stock_list)
+        logger.info(f'주식정보 가져오기 성공: {self.user_stock_num} 종목 보유')
 
     def get_user_credit_stock(self, after_market=False):
-        """Get user's credit stock information"""
-        logger.info('신용주식정보 가져오기')
-        self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
-        if not self.user_credit_stock_list:
-            raise Exception('주식 보유 없음')
+        """Get user's credit stock information with one retry"""
+        logger.info('신용주식정보 가져오기 시작')
+
+        try:
+            # 1차 시도
+            self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
+
+            if not self.user_credit_stock_list:
+                raise Exception('신용주식 보유 데이터 없음')
+
+        except Exception as e:
+            # 첫 번째 실패 시 재시도 로직
+            logger.warning(f'신용주식 1차 시도 실패 ({e}): 1회 재시도합니다.')
+
+            # 2차 시도 (마지막 시도)
+            self.user_credit_stock_list = self.trading.get_user_credit_stock(after_market)
+
+            # 2차 시도 후에도 데이터가 없는 경우
+            if not self.user_credit_stock_list:
+                logger.error('2차 시도 결과: 신용주식 보유 데이터가 여전히 없습니다.')
+                raise Exception('신용주식 보유 없음 (재시도 후에도 데이터가 없음)')
+
+        # 성공 시 개수 업데이트
         self.user_credit_stock_num = len(self.user_credit_stock_list)
+        logger.info(f'신용주식정보 가져오기 성공: {self.user_credit_stock_num} 종목 보유')
 
     def _can_run_credit_new_buy(self) -> bool:
         """신규 신용매수 가능 여부(당일 매수/매도 차이 기준)"""
