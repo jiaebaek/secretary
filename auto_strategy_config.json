@@ -3,8 +3,8 @@
   "auto_groups": [
     {
       "group_name": "auto_bundle_1",
-      "start": "22:00",
-      "end": "23:00",
+      "start": "09:00",
+      "end": "14:30",
       "strategies": [
         "장중-신용-통합매수",
         "대기",
@@ -12,7 +12,7 @@
         "추가매수-미체결-매도-취소",
         "장중-신용-매도"
       ],
-      "retry_interval_sec": 0
+      "retry_interval_sec": 1
     }
   ]
 }
