@@ -914,6 +914,15 @@ class ClearLocalOrderHistoryStrategy(TradingStrategy):
 
         logger.info("local_order_history 테이블의 모든 기록을 삭제했습니다.")
 
+class WaitStrategy(TradingStrategy):
+    """Strategy for menu '201': 로컬 주문 히스토리 전체 삭제"""
+
+    def execute(self, config: Dict[str, Any]) -> None:
+
+        logger.info(">>>>>>>>>>> 3분 동안 대기 <<<<<<<<<<<")
+        sleep(180)
+
+
 class TradingStrategyFactory:
     """Factory class to create appropriate trading strategy"""
 
@@ -952,6 +961,7 @@ class TradingStrategyFactory:
         '200': SaveHoldingSummaryStrategy,
         '201': ClearLocalOrderHistoryStrategy,
         '202': CancelUnfilledCreditSellStrategy,
+        '0000': WaitStrategy
     }
 
     @classmethod

@@ -12,6 +12,7 @@ from telegram_bot import send_telegram_msg
 st.set_page_config(layout="wide")
 
 CONFIG_FILE = 'strategy_config.json'
+AUTO_CONFIG_FILE = 'auto_strategy_config.json'
 STRATEGY_OPTIONS = list(STRATEGY_NAME_TO_CODE.keys())
 SCHEDULER_LOG_DIR = 'logs'
 
@@ -28,6 +29,30 @@ def load_strategy_config():
 def save_strategy_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
+
+
+def load_auto_strategy_config():
+    if os.path.exists(AUTO_CONFIG_FILE):
+        with open(AUTO_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {'auto_mode_enabled': False, 'auto_groups': []}
+
+
+def save_auto_strategy_config(config: dict):
+    with open(AUTO_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+
+def is_valid_hhmm(value: str) -> bool:
+    try:
+        parts = (value or '').split(':')
+        if len(parts) != 2:
+            return False
+        hh = int(parts[0])
+        mm = int(parts[1])
+        return 0 <= hh <= 23 and 0 <= mm <= 59
+    except Exception:
+        return False
 
 
 def parse_progress_from_log(log_content):
@@ -121,8 +146,9 @@ def main():
     st.title("📈 주식 매매 전략 관리 프로그램")
     st.markdown(f"**👤 계좌 주인: `{ACCOUNT_OWNER_NAME}`**")
     config = load_strategy_config()
+    auto_config = load_auto_strategy_config()
 
-    tab1, tab2, tab3 = st.tabs(["⚙️ 전략 설정", "⚡ 수동 실행", "📊 진행률 모니터링"])
+    tab1, tab2, tab3, tab4 = st.tabs(["⚙️ 전략 설정", "⚡ 수동 실행", "🤖 오토모드 설정", "📊 진행률 모니터링"])
 
     with tab1:
         col1, col2 = st.columns([2, 1])
@@ -229,6 +255,133 @@ def main():
                 st.success("✅ 백그라운드 시작!")
 
     with tab3:
+        st.subheader("🤖 오토모드 설정")
+
+        # 전역 on/off
+        auto_enabled = st.toggle(
+            "오토모드 활성화",
+            value=bool(auto_config.get('auto_mode_enabled', False)),
+            key='auto_mode_enabled_toggle',
+        )
+
+        # 저장 버튼(전역 on/off 반영용)
+        if st.button("오토모드 설정 저장", key="save_auto_mode_toggle"):
+            auto_config['auto_mode_enabled'] = auto_enabled
+            save_auto_strategy_config(auto_config)
+            st.success("오토모드 on/off 저장됨")
+            st.rerun()
+
+        st.markdown("---")
+        st.subheader("🧩 전략 묶음(순차 실행) 추가/수정")
+
+        with st.form("add_auto_group_form", clear_on_submit=True):
+            group_name = st.text_input("그룹 이름", "")
+            colA, colB, colC = st.columns(3)
+            with colA:
+                start_hhmm = st.text_input("start (HH:MM)", "09:00")
+            with colB:
+                end_hhmm = st.text_input("end (HH:MM)", "10:00")
+            with colC:
+                retry_interval_sec = st.number_input("재시도 간격(초)", min_value=1, value=10, step=1)
+
+            strategies = st.multiselect(
+                "전략 묶음(약 5개, 순차 실행)",
+                STRATEGY_OPTIONS,
+                default=[],
+            )
+
+            submitted = st.form_submit_button("그룹 저장")
+            if submitted:
+                if not group_name.strip():
+                    st.error("그룹 이름이 필요합니다.")
+                elif not is_valid_hhmm(start_hhmm) or not is_valid_hhmm(end_hhmm):
+                    st.error("start/end 형식은 HH:MM 이어야 합니다.")
+                elif not strategies:
+                    st.error("전략 묶음은 최소 1개 이상 선택해야 합니다.")
+                else:
+                    auto_config['auto_mode_enabled'] = auto_enabled
+                    new_group = {
+                        'group_name': group_name.strip(),
+                        'start': start_hhmm,
+                        'end': end_hhmm,
+                        'strategies': strategies,
+                        'retry_interval_sec': int(retry_interval_sec),
+                    }
+
+                    groups = auto_config.get('auto_groups') or []
+                    replaced = False
+                    for i, g in enumerate(groups):
+                        if g.get('group_name') == new_group['group_name']:
+                            groups[i] = new_group
+                            replaced = True
+                            break
+                    if not replaced:
+                        groups.append(new_group)
+                    auto_config['auto_groups'] = groups
+
+                    save_auto_strategy_config(auto_config)
+                    st.success("오토모드 그룹 저장됨")
+                    st.rerun()
+
+        st.markdown("### 📋 현재 등록된 오토모드 그룹")
+        groups = auto_config.get('auto_groups') or []
+        if not groups:
+            st.info("등록된 오토모드 그룹이 없습니다.")
+        else:
+            for i, g in enumerate(groups):
+                g_name = g.get('group_name') or f'group_{i}'
+                st.markdown(f"#### {g_name} ({g.get('start')} ~ {g.get('end')})")
+                st.caption(f"전략수: {len(g.get('strategies') or [])}")
+                for idx, s in enumerate(g.get('strategies')):
+                    st.markdown(f"&nbsp;&nbsp;{idx + 1}. {s}")
+
+                with st.expander("수정/삭제", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_start = st.text_input("start (HH:MM)", value=g.get('start') or '', key=f'auto_start_{i}')
+                        new_end = st.text_input("end (HH:MM)", value=g.get('end') or '', key=f'auto_end_{i}')
+                        new_retry = st.number_input(
+                            "재시도 간격(초)",
+                            min_value=1,
+                            value=int(g.get('retry_interval_sec') or 10),
+                            step=1,
+                            key=f'auto_retry_{i}'
+                        )
+                    with col2:
+                        new_strats = st.multiselect(
+                            "전략 묶음",
+                            STRATEGY_OPTIONS,
+                            default=g.get('strategies') or [],
+                            key=f'auto_strats_{i}'
+                        )
+
+                    if st.button("수정 저장", key=f'auto_save_{i}'):
+                        if not new_strats:
+                            st.error("전략 묶음은 최소 1개 이상 선택해야 합니다.")
+                        elif not is_valid_hhmm(new_start) or not is_valid_hhmm(new_end):
+                            st.error("start/end 형식은 HH:MM 이어야 합니다.")
+                        else:
+                            auto_config['auto_mode_enabled'] = auto_enabled
+                            g_updated = dict(g)
+                            g_updated['start'] = new_start
+                            g_updated['end'] = new_end
+                            g_updated['strategies'] = new_strats
+                            g_updated['retry_interval_sec'] = int(new_retry)
+                            groups[i] = g_updated
+                            auto_config['auto_groups'] = groups
+                            save_auto_strategy_config(auto_config)
+                            st.success("그룹 수정 저장됨")
+                            st.rerun()
+
+                    if st.button("삭제", key=f'auto_del_{i}'):
+                        auto_config['auto_mode_enabled'] = auto_enabled
+                        groups.pop(i)
+                        auto_config['auto_groups'] = groups
+                        save_auto_strategy_config(auto_config)
+                        st.success("그룹 삭제됨")
+                        st.rerun()
+
+    with tab4:
         display_progress_monitor()
 
 
