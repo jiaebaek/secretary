@@ -164,9 +164,6 @@ class AutoModeScheduler:
                         auto_cfg = self.load_auto_config()
                         if not auto_cfg.get("auto_mode_enabled", False):
                             return
-                        now_dt = datetime.now()
-                        if not self.is_time_in_window(now_dt, start_hhmm, end_hhmm):
-                            return
 
                         run_msg = f"[AutoScheduler:{group_name}] 전략 실행: {strategy_name}"
                         print(run_msg)
@@ -183,12 +180,9 @@ class AutoModeScheduler:
                             )
                             rc = -1
 
-                        # 프로세스가 끝났을 때 상태 재확인
+                        # 프로세스 종료 후 auto_mode_enabled만 재확인 (시간은 보지 않음)
                         auto_cfg = self.load_auto_config()
-                        now_dt = datetime.now()
-                        if (not auto_cfg.get("auto_mode_enabled", False)) or (
-                            not self.is_time_in_window(now_dt, start_hhmm, end_hhmm)
-                        ):
+                        if not auto_cfg.get("auto_mode_enabled", False):
                             return
 
                         if rc == 0:
