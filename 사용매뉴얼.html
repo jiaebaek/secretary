@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>주식비서(Secretary v2 REST) 사용 매뉴얼</title>
+  <style>
+    :root {
+      --bg: #f8f9fb;
+      --surface: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --border: #e2e6ee;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --warn-bg: #fff7ed;
+      --warn-border: #fdba74;
+      --danger-bg: #fef2f2;
+      --danger-border: #fca5a5;
+      --code-bg: #f1f5f9;
+      --sidebar-w: 260px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    nav.sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+    }
+
+    nav.sidebar h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+    }
+
+    nav.sidebar a {
+      display: block;
+      padding: 0.35rem 0.6rem;
+      color: var(--text);
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    nav.sidebar a:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    main {
+      flex: 1;
+      max-width: 920px;
+      padding: 2.5rem 3rem 4rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 0.5rem;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 2rem;
+      padding: 1rem 1.25rem;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+    }
+
+    h2 {
+      font-size: 1.45rem;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      margin: 1.75rem 0 0.75rem;
+      color: #334155;
+    }
+
+    p { margin: 0.75rem 0; }
+
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.4rem; }
+    li { margin: 0.35rem 0; }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.88em;
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin: 1rem 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.92rem;
+      background: var(--surface);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tr:nth-child(even) td { background: #fafbfc; }
+
+    .warn {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+
+    .danger {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+
+    .checklist {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .checklist li::before {
+      content: "☐ ";
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .summary-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .summary-box ol { margin: 0; }
+
+    strong { font-weight: 600; }
+
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      nav.sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      main { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h2>목차</h2>
+    <a href="#sec1">1. 시스템 개요</a>
+    <a href="#sec2">2. 프로그램 실행</a>
+    <a href="#sec3">3. 전략 실행 구조</a>
+    <a href="#sec4">4. 전략별 실제 동작</a>
+    <a href="#sec5">5. DB 설정</a>
+    <a href="#sec6">6. 신규매수 차단</a>
+    <a href="#sec7">7. 사용자 실수 사례</a>
+    <a href="#sec8">8. 체크리스트</a>
+    <a href="#sec9">9. 로그 확인</a>
+    <a href="#sec10">10. 핵심 요약</a>
+  </nav>
+
+  <main>
+    <h1>주식비서(Secretary v2 REST)<br>사용 매뉴얼</h1>
+    <p class="subtitle">
+      코드 실제 동작 기준으로 작성. DB 항목 이름과 실제 동작이 다를 수 있으므로
+      <strong>key 컬럼 문자열</strong>과 <strong>적용되는 전략</strong>을 함께 확인하세요.
+    </p>
+
+    <section id="sec1">
+      <h2>1. 시스템 개요</h2>
+      <p>이 프로그램은 <strong>키움 REST API</strong>로 주문하고, <strong>시간대별 전략</strong>을 자동 실행하는 자동매매 시스템입니다.</p>
+
+      <table>
+        <thead><tr><th>구성요소</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td><code>main.py</code></td><td>전략 1회 실행 (<code>--name</code> 또는 <code>--time</code>)</td></tr>
+          <tr><td><code>scheduler.py</code></td><td><code>strategy_config.json</code> 시간표 실행</td></tr>
+          <tr><td><code>auto_scheduler.py</code></td><td><code>auto_strategy_config.json</code> 오토모드 반복 실행</td></tr>
+          <tr><td><code>strategy_ui.py</code></td><td>Streamlit UI (전략/오토모드 설정)</td></tr>
+          <tr><td><code>admin_panel.py</code></td><td>Streamlit DB 설정 편집</td></tr>
+          <tr><td><code>D:\PycharmProjects\secretary_web\db.sqlite3</code></td><td>매매 파라미터 DB</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>매수는 코드상 3종류로 완전히 분리됩니다.</strong></p>
+      <table>
+        <thead><tr><th>종류</th><th>의미</th><th>제어 방법</th></tr></thead>
+        <tbody>
+          <tr><td><strong>현금 신규매수</strong></td><td>관심종목 중 미보유 종목 매수</td><td><code>신규종목매수</code> DB값 (현재 스케줄에는 미사용)</td></tr>
+          <tr><td><strong>신용 신규매수</strong></td><td>관심종목 중 미보유 종목 신용 매수</td><td><code>당일매수매도차이금액</code>, <code>신용매수설정</code></td></tr>
+          <tr><td><strong>물타기(추가매수)</strong></td><td>이미 보유 종목에 추가 매수</td><td><code>신용 물타기 기준(%)</code> 등 (신규매수 차단과 무관)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec2">
+      <h2>2. 프로그램 실행 방법</h2>
+      <p><code>start_app.bat</code>은 <strong>Streamlit UI + ngrok</strong>만 띄웁니다. 매매 자동 실행을 하려면 아래도 별도로 실행해야 합니다.</p>
+      <pre><code>python scheduler.py              :: 시간표 스케줄러
+python auto_scheduler.py         :: 오토모드 스케줄러
+python -m streamlit run strategy_ui.py   :: 전략 UI
+python -m streamlit run admin_panel.py :: DB 설정 UI (원격)</code></pre>
+      <ul>
+        <li>전략 로그: <code>D:\secretary_log\</code></li>
+        <li>스케줄러 로그: <code>logs\scheduler_YYYYMMDD.log</code>, <code>logs\auto_scheduler_YYYYMMDD.log</code></li>
+        <li>실행 완료 시 텔레그램 알림 발송</li>
+      </ul>
+    </section>
+
+    <section id="sec3">
+      <h2>3. 전략 실행 구조</h2>
+
+      <h3>3-1. 시간표 스케줄 (<code>strategy_config.json</code>)</h3>
+      <p>특정 <code>HH:MM</code>에 등록된 전략을 <strong>순서대로 1회</strong> 실행합니다.</p>
+      <ul>
+        <li><strong>07:59</strong> — 매도 → 통합매수 → 대기(3분) → 미체결취소 → … (장 시작 전 루틴)</li>
+        <li><strong>09:01~14:20</strong> — <code>장중-신용-통합매수</code> (20분 간격)</li>
+        <li><strong>15:33~</strong> — 장마감 매도/취소 루틴</li>
+      </ul>
+
+      <h3>3-2. 오토모드 (<code>auto_strategy_config.json</code>)</h3>
+      <p>현재 설정: <strong>09:00~14:30</strong> 구간에서 아래 묶음을 <strong>성공할 때까지 무한 반복</strong></p>
+      <pre><code>장중-신용-물타기-매수 → 대기(3분) → 미체결-현금신용매수-ALL-취소
+→ 추가매수-미체결-매도-취소 → 장중-신용-매도</code></pre>
+      <p>오토모드가 켜져 있으면(<code>auto_mode_enabled: true</code>), 같은 시간의 <strong>시간표 <code>장중-신용-통합매수</code>는 스킵</strong>됩니다. 대신 오토모드 묶음 안의 <strong>물타기</strong>가 반복 실행됩니다.</p>
+
+      <h3>3-3. 거래소 자동 전환 (<code>set_exchange</code>)</h3>
+      <table>
+        <thead><tr><th>시간</th><th>거래소</th></tr></thead>
+        <tbody>
+          <tr><td>08:35 이전</td><td>NXT</td></tr>
+          <tr><td>08:35 ~ 15:09</td><td>KRX</td></tr>
+          <tr><td>15:10 이후</td><td>NXT</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec4">
+      <h2>4. 전략별 실제 동작 (등록된 전략)</h2>
+
+      <h3>매수 관련 (가장 중요)</h3>
+      <table>
+        <thead><tr><th>전략명</th><th>실제 동작</th></tr></thead>
+        <tbody>
+          <tr><td><strong>장중-신용-통합매수</strong></td><td>① 신용 물타기(항상) → ② 조건 통과 시 신용 신규매수</td></tr>
+          <tr><td><strong>장중-신용-물타기-매수</strong></td><td>신용 물타기만</td></tr>
+          <tr><td><strong>장중-신용-신규매수</strong></td><td>신용 신규매수만</td></tr>
+          <tr><td><strong>장중-현금-신규-매수</strong></td><td>현금 신규매수 (<code>신규종목매수</code> 체크) — <strong>현재 스케줄에 없음</strong></td></tr>
+        </tbody>
+      </table>
+
+      <h3><code>장중-신용-통합매수</code> 상세 흐름</h3>
+      <pre><code>1. 잔고 조회 (신용 + 현금)
+2. [물타기] 보유 종목 전체 순회
+   - 수익률 ≤ 신용 물타기 기준(%) 이면 추가 매수
+   - 현금+신용 합산 보유액 ≥ 종목별 매수 최대 금액 이면 스킵
+3. [신규매수 차단 체크] 당일 (총매수 - 총매도) ≥ 당일매수매도차이금액 이면 신규매수 스킵
+4. [신규매수] 키움 조건식 관심종목에서 미보유 종목 신용 매수</code></pre>
+      <div class="warn"><strong>물타기는 3번 차단과 무관하게 항상 실행됩니다.</strong></div>
+
+      <h3>매도·취소·기타</h3>
+      <table>
+        <thead><tr><th>전략명</th><th>동작</th></tr></thead>
+        <tbody>
+          <tr><td>장중-신용-매도</td><td>신용 잔고 단계별 지정가 매도</td></tr>
+          <tr><td>장중-현금-매도</td><td>현금 잔고 단계별 매도</td></tr>
+          <tr><td>장중-신용현금-매도</td><td>현금 + 신용 동시 매도</td></tr>
+          <tr><td>장마감-신용-매도</td><td>장마감 전 신용 정리 매도</td></tr>
+          <tr><td>시간외NXT-신용현금-매도</td><td>시간외 NXT 매도</td></tr>
+          <tr><td>미체결-현금신용매수-ALL-취소</td><td>미체결 매수 전부 취소</td></tr>
+          <tr><td>추가매수-미체결-매도-취소</td><td>물타기 후 꼬인 신용 매도 미체결 취소</td></tr>
+          <tr><td>대기</td><td>3분(180초) 대기</td></tr>
+          <tr><td>잔고-내역-저장</td><td>DB <code>holding_summary</code> 갱신</td></tr>
+          <tr><td>매도주문-내역-삭제</td><td><code>local_order_history</code> 전체 삭제</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec5">
+      <h2>5. DB 설정 — 이름 vs 실제 동작</h2>
+      <p>DB는 <code>secretary_setup</code> 테이블의 <strong><code>key</code> 컬럼 문자열</strong>과 매칭됩니다. (<code>id</code>, <code>value</code>, <code>key</code> 구조)</p>
+
+      <h3>5-1. <code>secretary_setup</code> (기본설정)</h3>
+      <table>
+        <thead><tr><th>DB key</th><th>코드 변수</th><th>실제 동작</th></tr></thead>
+        <tbody>
+          <tr><td><strong>신규종목매수</strong></td><td><code>new_buy_stock</code></td><td><strong>현금 신규매수 전략에서만</strong> 사용. <code>0</code>이면 현금 신규매수 스킵. <strong>신용 신규매수·물타기에는 영향 없음</strong></td></tr>
+          <tr><td><strong>운영상태</strong></td><td><code>running_state</code></td><td>DB에서 읽기만 하고 <strong>코드 어디에서도 사용하지 않음</strong> → 바꿔도 매매에 영향 없음</td></tr>
+          <tr><td><strong>당일매수매도차이금액</strong></td><td><code>max_trading_diff</code></td><td><strong>신용 신규매수만</strong> 제한. 조건: <code>(당일 총매수 - 당일 총매도) &gt;= 이 값</code>이면 신규매수 차단</td></tr>
+          <tr><td><strong>신규매수주식금액</strong></td><td><code>buy_new_stock_amount</code></td><td><strong>현금</strong> 신규매수 1건 금액. <code>secretary_setup</code>에만 있음</td></tr>
+          <tr><td><strong>기본 보유종목 개수</strong></td><td><code>default_buy_new_stock_num</code></td><td>로드되지만 <code>set_buy_stock_num()</code>에서 <strong>사용 안 함</strong>(코드 주석 처리)</td></tr>
+          <tr><td><strong>종목별 매수 최대 금액(원)</strong></td><td><code>max_amount</code></td><td>현금 물타기 한도 + <strong>신용 물타기 시 현금+신용 합산 한도</strong></td></tr>
+          <tr><td><strong>신용 물타기 기준(%)</strong></td><td><code>rebuy_credit_earning_rate</code></td><td>이 수익률 이하일 때 물타기 매수 시도</td></tr>
+          <tr><td><strong>신용 물타기 매수금액</strong></td><td><code>rebuy_credit_stock_amount</code></td><td>물타기 1회 매수 금액</td></tr>
+          <tr><td><strong>신용 물타기 최대금액</strong></td><td><code>credit_max_amount</code></td><td>신용 물타기 종목별 상한</td></tr>
+          <tr><td><strong>신용 물타기 제외 종목</strong></td><td><code>except_credit_rebuy_list</code></td><td><code>/</code>로 구분. 종목명 <strong>완전 일치</strong> 시 제외 (<code>*삼성전자</code> 형태)</td></tr>
+          <tr><td><strong>물타기 제외 종목</strong></td><td><code>except_rebuy_list</code></td><td>현금 물타기 제외 (현재 스케줄에서 현금 물타기 전략 미사용)</td></tr>
+          <tr><td><strong>주문간격(초)</strong></td><td><code>order_interval</code></td><td>주문 간 대기(로드만, 일부 경로에서 참조)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5-2. <code>신용매수설정</code> 테이블 (별도!)</h3>
+      <table>
+        <thead><tr><th>key</th><th>실제 동작</th></tr></thead>
+        <tbody>
+          <tr><td><strong>신규매수주식개수</strong></td><td>신용 신규매수 시 관심종목에서 최대 시도 종목 수. <strong><code>0</code>이면 신규매수 루프 즉시 종료</strong></td></tr>
+          <tr><td><strong>신규매수주식금액</strong></td><td>신용 신규매수 1건 금액. <strong><code>0</code>이면 1주 매수</strong> (금액 0 = 차단이 아님)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5-3. 이름이 같아 헷갈리는 항목</h3>
+      <table>
+        <thead><tr><th>항목</th><th>위치</th><th>영향 범위</th></tr></thead>
+        <tbody>
+          <tr><td>신규매수주식금액</td><td><code>secretary_setup</code></td><td><strong>현금</strong> 신규매수</td></tr>
+          <tr><td>신규매수주식금액</td><td><code>신용매수설정</code></td><td><strong>신용</strong> 신규매수</td></tr>
+          <tr><td>신규매수주식개수</td><td><code>신용매수설정</code>만 존재</td><td><strong>신용</strong> 신규매수 (<code>secretary_setup</code>에는 없음)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec6">
+      <h2>6. 신규매수 차단 — 올바른 방법</h2>
+
+      <h3>6-1. 신용 <strong>신규매수</strong>만 막기 (물타기는 유지)</h3>
+      <p><strong>방법 A (권장): 스케줄 변경</strong></p>
+      <ul>
+        <li><code>장중-신용-통합매수</code> → <code>장중-신용-물타기-매수</code>로 교체</li>
+        <li>신규매수 단계가 아예 실행되지 않음</li>
+      </ul>
+      <p><strong>방법 B: DB 설정</strong></p>
+      <ul>
+        <li><code>신용매수설정</code> → <strong>신규매수주식개수 = 0</strong></li>
+        <li>또는 <code>당일매수매도차이금액</code>을 <strong>매우 작은 음수</strong> (예: <code>-999999999</code>) → 당일 차이가 거의 항상 기준 이상이 되어 신규매수 차단</li>
+      </ul>
+      <p><strong>방법 C: 오토모드</strong></p>
+      <ul>
+        <li>오토모드 묶음에 <code>장중-신용-통합매수</code>가 없으면 OK (현재는 물타기만 있음)</li>
+      </ul>
+
+      <h3>6-2. <code>당일매수매도차이금액</code> — 자주 틀리는 부분</h3>
+      <pre><code>당일 (총매수금액 - 총매도금액) &gt;= 당일매수매도차이금액  →  신용 신규매수 차단</code></pre>
+      <table>
+        <thead><tr><th>설정값</th><th>의미</th></tr></thead>
+        <tbody>
+          <tr><td><strong>0</strong></td><td>당일 순매수가 0원 이상이면 차단. <strong>장 초(매도가 더 많을 때)에는 신규매수 허용</strong></td></tr>
+          <tr><td><strong>30,000,000</strong> (기본값)</td><td>순매수 3천만 원 넘을 때만 차단</td></tr>
+          <tr><td><strong>-999,999,999</strong></td><td>거의 항상 차단</td></tr>
+        </tbody>
+      </table>
+      <div class="danger">
+        <strong>실제 로그 사례 (2026-06-12):</strong>
+        <ul>
+          <li>08:13 — 차이 <code>-4,843,960원</code>, 기준 <code>0원</code> → <strong>신규매수 실행됨</strong> (3건)</li>
+          <li>09:05 이후 — 차이 <code>+7,000,000원</code> 이상, 기준 <code>0원</code> → <strong>신규매수 차단됨</strong></li>
+          <li>이후 물타기는 계속 실행됨</li>
+        </ul>
+        <p><code>0</code>을 "매수 금지"로 이해하면 <strong>장 초에 신규매수가 나갈 수 있습니다.</strong></p>
+      </div>
+
+      <h3>6-3. <code>신규종목매수</code>만 0으로 바꾼 경우</h3>
+      <ul>
+        <li><strong>신용 신규매수에는 전혀 영향 없음</strong></li>
+        <li>현재 활성 스케줄에 <code>장중-현금-신규-매수</code>가 없어서 <strong>실질 효과도 없음</strong></li>
+      </ul>
+
+      <h3>6-4. <code>운영상태</code>를 0으로 바꾼 경우</h3>
+      <ul><li>코드에서 <strong>참조하지 않음</strong> → 아무 일도 안 일어남</li></ul>
+
+      <h3>6-5. 물타기까지 막기</h3>
+      <p>DB만으로는 불완전합니다. 아래를 함께 쓰세요.</p>
+      <ol>
+        <li>스케줄/오토모드에서 <code>장중-신용-물타기-매수</code>, <code>장중-신용-통합매수</code> 제거</li>
+        <li>또는 <code>신용 물타기 기준(%)</code>을 <code>-99</code> 등 극단적으로 낮춤</li>
+        <li>또는 <code>신용 물타기 제외 종목</code>에 제외할 종목명을 <code>/</code>로 나열</li>
+      </ol>
+    </section>
+
+    <section id="sec7">
+      <h2>7. 사용자 실수 사례 정리</h2>
+      <table>
+        <thead><tr><th>시도한 설정</th><th>기대</th><th>실제</th></tr></thead>
+        <tbody>
+          <tr><td><code>신규종목매수 = 0</code></td><td>모든 신규매수 차단</td><td><strong>신용 신규매수·물타기 무관</strong>. 현금 신규 전략도 스케줄에 없음</td></tr>
+          <tr><td><code>당일매수매도차이금액 = 0</code></td><td>매수 완전 차단</td><td><strong>순매수가 음수일 때(장 초) 신규매수 허용</strong>. 08:13에 3건 체결</td></tr>
+          <tr><td><code>신용매수설정</code> 금액/개수 = 0</td><td>매수 차단</td><td>개수 0은 신규 차단 OK. <strong>금액 0은 1주 매수</strong></td></tr>
+          <tr><td><code>운영상태 = 0</code></td><td>프로그램 정지</td><td><strong>코드 미사용, 무효</strong></td></tr>
+          <tr><td>DB 수정 후에도 매수됨</td><td>즉시 반영</td><td>전략은 <strong>실행 시작 시</strong> <code>update_options()</code>로 DB 읽음. <strong>이미 돌고 있는 프로세스에는 미반영</strong></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec8">
+      <h2>8. 신규매수 차단 체크리스트</h2>
+      <p>신용 신규매수를 확실히 막으려면:</p>
+      <ul class="checklist">
+        <li><code>strategy_config.json</code> / 오토모드에서 <code>장중-신용-통합매수</code>, <code>장중-신용-신규매수</code> 제거 또는 <code>장중-신용-물타기-매수</code>만 사용</li>
+        <li><code>신용매수설정</code> → <strong>신규매수주식개수 = 0</strong></li>
+        <li><code>당일매수매도차이금액</code> = <strong>-999999999</strong> (또는 충분히 작은 음수)</li>
+        <li><code>신규종목매수</code>는 신용에 영향 없음 — 혼동 금지</li>
+        <li>DB 수정 후 <strong>다음 전략 실행 전</strong>에 저장됐는지 확인</li>
+        <li>로그에서 <code>!!! 신규 매수 제한</code> 또는 <code>신용주식 신규 매수 진행</code> 문구 확인</li>
+      </ul>
+      <p>물타기까지 막으려면 추가로:</p>
+      <ul class="checklist">
+        <li>스케줄에서 물타기/통합매수 전략 제거</li>
+        <li>또는 <code>신용 물타기 기준(%)</code> 극단 조정 / 제외 종목 등록</li>
+      </ul>
+    </section>
+
+    <section id="sec9">
+      <h2>9. 로그로 동작 확인하는 법</h2>
+      <table>
+        <thead><tr><th>로그 문구</th><th>의미</th></tr></thead>
+        <tbody>
+          <tr><td><code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; 신용주식 추가 매수 (물타기)</code></td><td>물타기 시작 (신규 차단과 무관)</td></tr>
+          <tr><td><code>매수-매도 차이 체크: X원 (기준: Y원)</code></td><td>신용 신규매수 차단 판단 직전</td></tr>
+          <tr><td><code>!!! 신규 매수 제한</code></td><td>신용 신규매수 <strong>차단됨</strong></td></tr>
+          <tr><td><code>매수 조건 충족: 신용주식 신규 매수 진행</code></td><td>신용 신규매수 <strong>실행됨</strong></td></tr>
+          <tr><td><code>------- 지정가로 매수!!</code> (관심종목)</td><td>신용 <strong>신규</strong> 매수 주문</td></tr>
+          <tr><td><code>------- 신용 현재가 매수!!</code> (보유종목)</td><td><strong>물타기</strong> 매수 주문</td></tr>
+          <tr><td><code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; 현금주식 신규 매수</code></td><td>현금 신규매수 (<code>신규종목매수</code> 체크)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec10">
+      <h2>10. 핵심 요약</h2>
+      <div class="summary-box">
+        <ol>
+          <li><strong>이름에 "신규"가 있어도 전부 같은 스위치가 아닙니다.</strong> <code>신규종목매수</code>는 현금 전용, 신용은 <code>신용매수설정</code>과 <code>당일매수매도차이금액</code>이 별도입니다.</li>
+          <li><strong><code>장중-신용-통합매수</code>는 물타기를 먼저 하고</strong>, 그다음 신규매수 여부를 판단합니다. DB로 신규만 막아도 <strong>물타기는 계속</strong>됩니다.</li>
+          <li><strong><code>당일매수매도차이금액 = 0</code>은 "완전 차단"이 아닙니다.</strong> 장 초 순매도 상태에서는 신규매수가 나갈 수 있습니다.</li>
+          <li><strong><code>운영상태</code>는 현재 무효</strong>합니다. 스케줄/오토모드 on/off로 제어하세요.</li>
+          <li>설정 변경은 <strong>다음 <code>main.py</code> 실행 시</strong> 반영됩니다. 실행 중인 프로세스에는 적용되지 않습니다.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
